@@ -7,3 +7,5 @@ public/core/*.js
 public/core/*.data
 .core-work/
 dist-core/
+native/test/wpad/*.elf
+native/test/wpad/*.map

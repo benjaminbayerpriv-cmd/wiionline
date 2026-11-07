@@ -1,0 +1,6 @@
+{
+ "image": "devkitpro/devkitppc@sha256:04bab308c032848c1ca5a09c02b4aaa4d505efd7996aab05b9a4eb15231b2868",
+ "result_symbol": "g_wpad_result",
+ "result_addr": 2147816992,
+ "dol_sha256": "d5f7a98092a4f49680df2e4c4c28c06c271209957ca37c69189db547c9c43505"
+}
