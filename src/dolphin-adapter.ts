@@ -183,3 +183,5 @@ export async function createCore(emit: (event: CoreEvent) => void): Promise<Emul
   await loadSystemFonts(module);
   return new DolphinAdapter(module, emit);
 }
+
+export { loadSystemFonts } from './system-fonts';

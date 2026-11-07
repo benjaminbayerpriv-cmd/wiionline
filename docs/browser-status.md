@@ -31,3 +31,7 @@ User supplied Wii Play (Europe, Rev 1).rvz, 167047716 bytes, correct RVZ magic. 
 ## Performance-claim correction
 
 User observed that the reported FPS and 100% speed do not match visible game behavior. Codex had labeled native VI/XFB publication cadence as game FPS and a timer-derived ratio as game speed. Those signals were not validated against actual guest-rendered frames or observed game time, so the quantitative UI display and the speed claim have been withdrawn. Cached+JIT is enabled, but real gameplay speed remains unverified and visible slowdown remains open. Repeated scanout of the same XFB must not count as new game-rendered frames.
+
+## Browser guest input proof
+
+The 2dfdb65 WPAD DOL was run with the actual installed module and production TypeScript adapter in the in-app browser. All 25 browser guest checks passed, then passed again on a fresh worker. The test reads guest memory over WiiOnline_CopyGuest and does not use TestPrepareInput. Captured raw result: graphics/results/wpad-browser.json. Reproduction: graphics/tests/wpad/README.md. Keyboard DOM handlers/focus loss, absolute IR geometry, Wii Play responsiveness and real game speed are not covered by that result.

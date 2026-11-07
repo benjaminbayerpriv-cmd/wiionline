@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build && vite build --config vite.adapter.config.ts",
     "preview": "vite preview --host 127.0.0.1",
     "test": "tsx --test tests/*.test.ts && node scripts/av-test-frame-bridge.mjs",
-    "core:install": "node scripts/install-core.mjs"
+    "core:install": "node scripts/install-core.mjs",
+    "test:browser:stage": "node scripts/av-stage-browser-tests.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
