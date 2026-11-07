@@ -25,6 +25,8 @@ export class DolphinAdapter implements EmulatorCore {
   private lastStatus = '';
   private frameBridge?: ReturnType<typeof createFrameBridge>;
   private frameAtBoot = 0;
+  private lastDeliveredGeneration = 0;
+  private frameTimer?: ReturnType<typeof setInterval>;
   private audioBridge?: ReturnType<typeof createAudioBridge>;
   private audioClock = 0;
   constructor(private module: DolphinModule, private emit: (event: CoreEvent) => void) {
@@ -64,14 +66,17 @@ export class DolphinAdapter implements EmulatorCore {
     this.module.ccall('PumpHostJobs', null, [], []);
     const status = this.text('GetCoreStatus');
     if (status !== this.lastStatus) { this.lastStatus = status; this.emit({ type: 'log', message: status }); }
-    if (this.booted && this.frameBridge) {
-      const generation = this.number('GetFrame') >>> 0;
-      // We never call RunFrame: only a positive native XFB/GL publication may display.
-      // Skip the initial metadata image and the previous title's unchanged frame.
-      if (generation > 0 && generation !== this.frameAtBoot) {
-        const frame = this.frameBridge.read();
-        if (frame) this.emit({ ...frame, type: 'frame' });
-      }
+  }
+  /** Eigener, leichter Takt nur fuer Bilder: liefert ein Bild, sobald der Kern eine neue Generation veroeffentlicht hat.
+   * Getrennt vom schweren Pump-Takt (Host-Jobs, Status, Audio), damit die Anzeige nicht an dessen Dauer haengt. */
+  private deliverFrame() {
+    if (!this.booted || !this.frameBridge) return;
+    const generation = this.number('GetFrame') >>> 0;
+    // We never call RunFrame: only a positive native XFB/GL publication may display.
+    // Skip the initial metadata image and the previous title's unchanged frame.
+    if (generation > 0 && generation !== this.frameAtBoot && generation !== this.lastDeliveredGeneration) {
+      const frame = this.frameBridge.read();
+      if (frame) { this.lastDeliveredGeneration = generation; this.emit({ ...frame, type: 'frame' }); }
     }
   }
   async load(file: File) {
@@ -141,8 +146,12 @@ export class DolphinAdapter implements EmulatorCore {
         this.emit({ type: 'error', code: 'NATIVE_PUMP_FAILURE', message: String(error) });
       }
     }, 20);
+    if (!this.frameTimer) this.frameTimer = setInterval(() => { try { this.deliverFrame(); } catch { /* der Pump-Takt meldet Kernfehler */ } }, 4);
   }
-  private clearPump() { if (this.timer) clearInterval(this.timer); this.timer = undefined; }
+  private clearPump() {
+    if (this.timer) clearInterval(this.timer); this.timer = undefined;
+    if (this.frameTimer) clearInterval(this.frameTimer); this.frameTimer = undefined;
+  }
   async pause() {
     this.input(neutralInput());
     this.requireOne('SetCorePaused', ['number'], [1]);
