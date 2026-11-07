@@ -59,3 +59,20 @@ The real-GPU row was produced by pasting `probe.js` into the browser's JS consol
 - No Emscripten toolchain and no core build: step 3 (a frame from emulated homebrew) is blocked on the core agent's pinned Emscripten and a Dolphin WASM build. Nothing here is a Wii frame.
 - No real-GPU CI; the reproducible runs are software-rendered and cannot validate dual-source blending or performance.
 - Proposed next steps (need coordination): adopt the core agent's final revision and toolchain, re-check sections 1 and 2 against it, then capture a first homebrew frame (native reference build only after the SHA is agreed); dump the GLSL ES 3.00 Dolphin generates and compile it in WebGL2; define the Emscripten GL context hook with the core agent.
+
+## 5. Reassessment against the shared baseline (core-wasm 9ac4a6a)
+Read from `origin/claude/core-wasm` at `9ac4a6a`: Dolphin `e22551eae1c84a7e4d0b6a5c519ef4ed4ef69df1`, Emscripten 5.0.7, 66 imported patches from `dougchansan/wasm-dolphin` `7e38409`. **Static reading of the patches only: nothing has been built or run by me, and the core agent reports the browser build is still in progress.** Sections 1 and 2 above were derived at `4a70679d…`; where they conflict with this section, this section wins.
+
+What the patch set already contains (by file list and grep, not execution):
+- `0004` Software and OGL: browser (`__EMSCRIPTEN__`) fixes for the OGL backend under WebGL2 (conservative backend info with reverse-Z off, no clip control, `glMapBufferRange` invalidate flags, a vertex-attribute workaround, worker-owned WebGL), plus a software-rasteriser XFB fast path. So the OGL/WebGL2 route I recommended is *already attempted upstream of us*; a separate OGL bridge from me would duplicate it.
+- `0005` VideoCommon shader changes and `0006`+ a WebGPU backend (`Source/Core/VideoBackends/WebGPU`, GLSL to glslang to SPIR-V to Naga to WGSL via `emdawnwebgpu`) with ~50 follow-up patches (command stream, ring protocol, UBO caches). The core agent currently links a **stub** for Naga (`native/stubs/naga_stub.c`), so this path cannot compile shaders yet.
+- `0006` sets `bSupportsDualSourceBlend = false` for WebGPU because WGSL translation rejected it. My real-GPU test shows the WebGPU `dual-source-blending` feature and WebGL2 dual-source blending both exist on current desktop Chrome, so this is a Naga/translator limit rather than a browser one (not tested through Naga).
+- `native/test/` has a `hello_wii.dol` plus `expected.json` for a CPU trace gate (checksums, not a rendered frame).
+
+Revised recommendation (replaces section 2 for planning purposes):
+1. **Do not add a second renderer.** Reuse what exists.
+2. **First homebrew frame: software-rasteriser XFB path** (already in `0004`, returns RGBA to the `frame` event in `src/protocol.ts`). It needs no GPU API and is the correctness oracle for any GPU backend.
+3. **GPU path: keep both existing backends as candidates and decide by measurement.** WebGL2/OGL is the smaller, synchronous path (cost: bounding box, compute decoding, GS and logic-op losses); the WebGPU backend is far larger but blocked on a real Naga. The dual-source result favours neither; it matters for TEV blending accuracy on both. No performance numbers exist yet, so no winner is claimed.
+4. Audio patch `0002` exists; I have not reviewed it. Audio work starts after a real frame.
+
+Open questions for the core agent: which backend `dolphin_web_core` selects by default (the source mentions a "Software to WebGPU presenter hybrid"), whether the OGL WebGL2 path has been executed at all, and what blocks real Naga.
