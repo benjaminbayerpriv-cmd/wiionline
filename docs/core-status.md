@@ -67,7 +67,17 @@ Boot bis Ausführungsbeginn ca. 0,5 s (Node). Daraus grob 25 / 75 / 87 Mio. Befe
 7. Patchsatz stammt aus einem Forschungsprojekt (66 Patches, viele WebGPU); Wartbarkeit/Upstream-Aktualität ist ein Risiko. Der Build zieht zusätzlich den `emdawnwebgpu`-Port.
 8. Vollständiger Neubau von leerem Ordner und Bitgleichheit sind nicht verifiziert (siehe oben).
 
+## Artefaktpfad für Codex (Host: dieser Mac, keine VM)
+`/Users/benjaminbayer/work/wiionline/dist-core/` enthält genau `dolphin-core-upstream.js`, `dolphin-core-upstream.wasm`, `SHA256SUMS` (geprüft mit `shasum -a 256 -c`). Es gibt keine `.data`-Datei und keine weiteren Begleitdateien: das Wii-NAND-Seed ist ins WASM eingebettet. Das `.js` ist ein ES-Modul (`export default createDolphinCore`) und startet seine 16 Pthread-Worker aus sich selbst per `new URL("dolphin-core-upstream.js", import.meta.url)`, beide Dateien müssen also im selben Verzeichnis liegen. Erforderlich: COOP `same-origin`, COEP `require-corp`, `application/wasm`. Der Ordner ist gitignored; der Build ist reproduzierbar, die Artefakte werden nicht eingecheckt.
+
+## Eingabe: aktueller Stand und nächster Kernschritt
+`SetInputMask`/`SetInputState` (in `dolphin_web_discio.cpp`) steuern ein **GameCube-Pad** (Maske, Sticks, Trigger, Analog A/B), **nicht** die Wiimote. Es gibt derzeit keinen Wii-Input-Export (Tasten, IR-Zeiger, Beschleunigung, Erweiterungen). Nächster Kernschritt: ein Export wie `WiiOnline_SetWiimote(buttonMask, irX, irY, irVisible, accel…)`, der in Dolphins emulierte Wiimote (WiimoteEmu, Bluetooth-Pass-through ist im Browser nicht verfügbar) einspeist; dafür muss die Controller-Konfiguration auf „Emulated Wiimote“ gestellt und die Quelle (ControllerInterface-Gerät) im Kern angelegt werden. Noch nicht implementiert, noch nicht getestet.
+
+## Frames
+`GetFrame`/`FrameBuffer`/`RunFrame` des Altbestands liefern über `RenderMetadataFrame` ein **synthetisches Bild**, kein Wii-XFB. Nicht als Wii-Ausgabe verwenden. Eine echte XFB-Snapshot-Brücke ist mit dem AV-Zweig abzustimmen.
+
 ## Adapter
+Hinweis: Codex implementiert den maßgeblichen TypeScript-Adapter (`src/dolphin-adapter.ts`, PR #2). `native/adapter/adapter.js` ist nur eine Referenz/Testhilfe aus der Kernprüfung (nutzt dieselben Exporte CoreInit, SetVideoBackend, SetCpuThread, BootDisc, PumpHostJobs, SetCorePaused, StopCore) und wird nicht ausgeliefert. Der Erst-Eintrag unten bleibt zur Dokumentation.
 `native/adapter/adapter.js` exportiert `createCore(emit, options)` nach `src/protocol.ts` (`.dol`, `load/start/pause/stop`, Status-/Log-/Metrikereignisse). Headless verifiziert (`run-adapter-node.mjs`: Zustände idle→loading→ready→running, Speicherwerte korrekt). Im Worker von Codex noch nicht integriert; Auslieferung als `/core/adapter.js` neben den Artefakten. Vorschlag zum Vertrag: `CoreInfo.formats` bleibt `[".dol"]`; ein optionales `CreateCore`-Optionsobjekt (`cpu`, `wasmJit`) wäre nützlich.
 
 ## Nächste Schritte
