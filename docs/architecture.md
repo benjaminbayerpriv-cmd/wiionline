@@ -17,3 +17,5 @@ Commands are serialized; inputs can update during execution. Core start must ret
 Serve HTTPS (localhost is suitable for development), application/wasm and COOP same-origin / COEP require-corp. Vite dev and preview supply headers. Production host must supply equivalent headers; a static upload alone does not prove threaded runtime support.
 
 Acceptance gates: reproducible toolchain → actual Wii homebrew CPU trace → actual rendered frame → input response → synchronized sound → measured performance and game compatibility. Browser shell tests do not prove emulation.
+
+Runtime owns lifecycle status events; adapters should emit frame/audio/log/metrics/error, not independently change wrapper states. Fatal asynchronous native errors are preserved even when a command promise resolves. Use stop to recover if the initialized core can unload safely; otherwise reload the page.
