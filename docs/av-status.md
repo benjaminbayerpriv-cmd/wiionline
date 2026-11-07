@@ -76,3 +76,20 @@ Revised recommendation (replaces section 2 for planning purposes):
 4. Audio patch `0002` exists; I have not reviewed it. Audio work starts after a real frame.
 
 Open questions for the core agent: which backend `dolphin_web_core` selects by default (the source mentions a "Software to WebGPU presenter hybrid"), whether the OGL WebGL2 path has been executed at all, and what blocks real Naga.
+
+## 6. Framebuffer to `frame` event: prepared path (core-wasm 9ac4a6a)
+Static reading only; nothing here has run against a real core build.
+
+Data flow with the Software renderer (`SetVideoBackend("Software")`, patch 0005 `Video_OutputXFB`):
+1. Dolphin outputs an XFB (YUYV, in guest RAM) and calls `DolphinWeb_OnXfb(xfb, width, stride, height)` (`dolphin_web_discio.cpp`).
+2. The core decodes it to RGBA in `s_framebuffer` (`uint32` words `0xAABBGGRR`, little-endian, so bytes are R,G,B,A) at the presentation size (`SetPresentationScale`), then does `++s_frame` and stores/notifies `s_frame_signal`.
+3. JS reads `FrameWidth()`, `FrameHeight()`, `FrameBuffer()` (heap pointer), `GetFrame()`.
+
+`graphics/bridge/frame-bridge.mjs` implements the JS side: it copies `w*h*4` bytes out of `HEAPU8` into a private, transferable `ArrayBuffer` and returns the protocol `frame` event (`src/protocol.ts`). It re-reads `GetFrame()` after the copy and drops/counts frames that changed meanwhile (the core has one framebuffer, no double buffering). `node scripts/av-test-frame-bridge.mjs` checks byte order, copy privacy, torn-frame and bad-geometry handling against a **fake module**; it proves the bridge contract only, not emulation.
+
+Exports: everything needed is already exported (`_FrameWidth _FrameHeight _FrameBuffer _GetFrame _GetFrameSignalPtr _RunFrame _SetPresentationScale _SetVideoBackend`, runtime method `HEAPU8`; memory growth is off, so the heap view stays valid). No new core export is requested for the baseline. Optional later requests: a frame sequence counter that is only incremented after the decode completes, or a double-buffered framebuffer, if torn frames show up in measurements.
+
+Not yet verified (needs a running core): that `DolphinWeb_OnXfb` fires with the Software backend and a homebrew XFB, the real presentation size, the XFB-callback to `GetFrame()` ordering, and the Y orientation (the OGL copy path flips Y; the YUYV path does not).
+
+## 7. Test program needed for the first real frame
+`native/test/hello_wii.dol` only writes checksums to RAM (CPU gate), so it never scans out an XFB. A graphics gate needs a self-written homebrew that programs the VI and an XFB (and later GX). The core's `build_hello_dol.py` shows the no-cross-compiler approach (own PPC encoder). Plan: (1) own DOL that fills an XFB in MEM1 with a known pattern and programs VI registers, which verifies the XFB-to-`frame` path; (2) a DOL that issues GX commands, which verifies the rasteriser itself. Expected pixels/hash are computed independently from the program, not from emulator output. Not written yet: VI register setup cannot be validated without a running core, and I would rather not guess it.
