@@ -1387,6 +1387,7 @@ int RunPpcWasmIntegerBlockSmoke()
 // Lesen waehrend die CPU laeuft ist unsynchronisiert; Tests pausieren zuerst.
 // ---------------------------------------------------------------------------
 #include <emscripten.h>
+#include "Core/HW/Memmap.h"
 
 static const std::uint8_t* WiiOnlineGuestPtr(std::uint32_t addr, std::uint32_t len)
 {

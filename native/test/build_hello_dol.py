@@ -12,10 +12,11 @@ Programm (Eintritt 0x80004000):
   4. Marker "DONE" (0x444F4E45) nach 0x90100010, danach Endlosschleife
   Hinter der Schleife steht ein nie ausgefuehrtes 'mtspr HID4,r0' (0x7C13FBA6): Dolphin
   erkennt DOLs mit diesem Muster als Wii-Programme (DolReader::m_is_wii).
-Aufruf: build_hello_dol.py hello_wii.dol   (gibt expected.json auf stdout aus)
+Aufruf: build_hello_dol.py hello_wii.dol [LCG-Iterationen]   (gibt expected.json auf stdout aus)
 """
 import hashlib, json, struct, sys
 
+LCG_ITERS = int(sys.argv[2]) if len(sys.argv) > 2 else 10000   # Benchmark-Variante: z.B. 20000000
 BASE = 0x80004000
 RES = 0x90100000
 
@@ -46,7 +47,7 @@ emit(addi(7, 7, 1)); emit(add(5, 5, 7)); emit(bdnz(loop1 - here()))
 emit(stw(5, 8, 3))
 emit(lis(8, 0x0019)); emit(ori(8, 8, 0x660D))                       # 1664525
 emit(lis(9, 0x3C6E)); emit(ori(9, 9, 0xF35F))                       # 1013904223
-emit(li(10, 1)); emit(li(6, 10000)); emit(mtctr(6))
+emit(li(10, 1)); emit(lis(6, LCG_ITERS >> 16)); emit(ori(6, 6, LCG_ITERS & 0xFFFF)); emit(mtctr(6))
 loop2 = here()
 emit(mullw(10, 10, 8)); emit(add(10, 10, 9)); emit(bdnz(loop2 - here()))
 emit(stw(10, 12, 3))
@@ -70,7 +71,7 @@ open(sys.argv[1] if len(sys.argv) > 1 else "hello_wii.dol", "wb").write(dol)
 
 s, x = 0, 1
 for i in range(1, 1001): s += i
-for _ in range(10000): x = (x * 1664525 + 1013904223) & 0xFFFFFFFF
+for _ in range(LCG_ITERS): x = (x * 1664525 + 1013904223) & 0xFFFFFFFF
 exp = {"magic": "WIIONLIN", "sum": s, "lcg": x, "done": 0x444F4E45, "result_addr": RES,
-       "entry": BASE, "end_loop_pc": BASE + end, "sha256": hashlib.sha256(dol).hexdigest()}
+       "lcg_iters": LCG_ITERS, "entry": BASE, "end_loop_pc": BASE + end, "sha256": hashlib.sha256(dol).hexdigest()}
 print(json.dumps(exp, indent=1))

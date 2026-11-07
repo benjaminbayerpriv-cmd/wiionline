@@ -5,12 +5,20 @@ import createDolphinCore from "./dolphin-core-upstream.js";
 const log = (m) => postMessage({ type: "log", m });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+self.onerror = (e) => log("worker onerror: " + (e.message || e));
+self.onunhandledrejection = (e) => log("unhandledrejection: " + e.reason);
 onmessage = async (ev) => {
-  const { cpu = "interpreter", dolUrl = "hello_wii.dol", expectedUrl = "expected.json", timeoutMs = 120000 } = ev.data;
+  const { cpu = "interpreter", dolUrl = "hello_wii.dol", expectedUrl = "expected.json", timeoutMs = 240000, jit = 0 } = ev.data;
   const t0 = performance.now();
   try {
     const [dol, expected] = await Promise.all([
       fetch(dolUrl).then((r) => r.arrayBuffer()), fetch(expectedUrl).then((r) => r.json())]);
+    log("worker gestartet, lade Kern ...");
+    if (ev.data.trace) {
+      const of = self.fetch; self.fetch = (...a) => { log("fetch " + a[0]); return of(...a).then((r) => { log("fetch ok " + r.status); return r; }); };
+      const OW = self.Worker; self.Worker = class extends OW { constructor(u, o) { log("new Worker " + u); super(u, o); this.addEventListener("error", (e) => log("pthread-worker error " + e.message + " @" + e.filename + ":" + e.lineno + ":" + e.colno + " " + (e.error && e.error.stack))); } };
+      const om = WebAssembly.Memory; WebAssembly.Memory = class extends om { constructor(d) { log("Memory " + JSON.stringify(d)); super(d); } };
+    }
     const M = await createDolphinCore({ dolphinCoreLog: true, print: log, printErr: log });
     const c = (n, r, a, v) => M.ccall(n, r, a, v);
     log(`Modul geladen nach ${(performance.now() - t0).toFixed(0)} ms; ${c("WiiOnline_BuildInfo", "string", [], [])}`);
@@ -18,6 +26,7 @@ onmessage = async (ev) => {
     log(`SetVideoBackend(Null)=${c("SetVideoBackend", "number", ["string"], ["Null"])}`);
     log(`SetCpuCore(${cpu})=${c("SetCpuCore", "number", ["string"], [cpu])}`);
     log(`SetCpuThread(1)=${c("SetCpuThread", "number", ["number"], [1])}`);
+    if (jit) log(`SetPpcWasmJitEnabled(${jit})`), c("SetPpcWasmJitEnabled", null, ["number"], [jit]);
     c("SetAudioMuted", "number", ["number"], [1]);
     c("CoreInit", "number", [], []);
     const tBoot = performance.now();
@@ -48,7 +57,7 @@ onmessage = async (ev) => {
       got.done === expected.done && pc === expected.end_loop_pc && isWii === 1;
     postMessage({ type: "result", verdict, cpu, got, expected, pc: "0x" + pc.toString(16), isWii,
       cpuCoreName: c("GetCPUCoreName", "string", [], []), state: c("GetCoreStateName", "string", [], []),
-      guestTicks: ticks.toString(), bootToDoneMs: Math.round(tDone - tBoot), resultMemHex: hex,
+      guestTicks: ticks.toString(), jit, jitCompiled: M._GetPpcWasmBlockCompileCount ? c("GetPpcWasmBlockCompileCount", "number", [], []) : null, jitRuns: M._GetPpcWasmBlockRunCount ? c("GetPpcWasmBlockRunCount", "number", [], []) : null, bootToDoneMs: Math.round(tDone - tBoot), resultMemHex: hex,
       userAgent: self.navigator?.userAgent ?? "node" });
     c("StopCore", null, [], []);
   } catch (e) {
