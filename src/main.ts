@@ -1,5 +1,6 @@
+import { bindBrowserInput } from './browser-input';
 import './style.css';
-import type { Button, Command, CoreEvent, CoreInfo, EmulatorState } from './protocol';
+import type { Command, CoreEvent, CoreInfo, EmulatorState } from './protocol';
 import { validateFile } from './validation';
 import { AudioOutput } from './audio';
 
@@ -20,7 +21,7 @@ app.innerHTML = `
       <section class="file-panel"><h2>Software öffnen</h2><p>Wähle eine Datei von deinem Computer. Sie wird nicht hochgeladen.</p>
       <label class="file-button" id="file-label" aria-disabled="true">Datei auswählen<input id="file" type="file" disabled></label>
       <p id="filename">Noch keine Datei ausgewählt</p><p id="formats" class="detail">Formate werden vom Kern gemeldet.</p></section>
-      <section><h2>Steuerung</h2><p id="input-status" class="detail">Wii-Steuerung noch nicht mit einem Kern verbunden.</p><dl class="keys"><div><dt>A / B</dt><dd><kbd>X</kbd> <kbd>Z</kbd></dd></div><div><dt>Steuerkreuz</dt><dd>Pfeiltasten</dd></div><div><dt>1 / 2</dt><dd><kbd>1</kbd> <kbd>2</kbd></dd></div><div><dt>Plus / Minus</dt><dd><kbd>Enter</kbd> <kbd>−</kbd></dd></div><div><dt>Home</dt><dd><kbd>H</kbd></dd></div><div><dt>Zeiger</dt><dd>Maus im Spielbild</dd></div></dl><p class="detail">Zum Steuern zuerst ins Spielbild klicken. Bewegungssensoren werden noch nicht unterstützt.</p></section>
+      <section><h2>Steuerung</h2><p id="input-status" class="detail">Wii-Steuerung noch nicht mit einem Kern verbunden.</p><dl class="keys"><div><dt>A / B</dt><dd><kbd>X</kbd> <kbd>Z</kbd> oder Maus links / rechts</dd></div><div><dt>Steuerkreuz</dt><dd>Pfeiltasten</dd></div><div><dt>1 / 2</dt><dd><kbd>1</kbd> <kbd>2</kbd></dd></div><div><dt>Plus / Minus</dt><dd><kbd>Enter</kbd> <kbd>−</kbd></dd></div><div><dt>Home</dt><dd><kbd>H</kbd></dd></div><div><dt>Zeiger</dt><dd>Maus im Spielbild</dd></div></dl><p class="detail">Zum Steuern zuerst ins Spielbild klicken. Für A+B gleichzeitig (z. B. Wii-Play-Titelbild) linke und rechte Maustaste drücken. Bewegungssensoren werden noch nicht unterstützt.</p></section>
       <section><h2>Browser & Kern</h2><ul id="capabilities"></ul><p id="core-info" class="detail">Kein Kern verbunden</p><button id="retry" class="quiet">Kern erneut prüfen</button></section>
     </aside>
   </div>
@@ -43,12 +44,12 @@ let core: CoreInfo | undefined;
 let pending = false;
 let starting = false;
 let hasFrame = false;
-const buttons = new Set<Button>();
-let pointer = { x: 0.5, y: 0.5, visible: false };
 function appendLog(message: string) { log.textContent = [...(log.textContent || '').split('\n'), message].slice(-150).join('\n'); }
 function send(command: Command) { worker?.postMessage(command); }
-function input() { if (!core?.capabilities?.wiiInput) return; send({ type: 'input', input: { buttons: [...buttons], pointer } }); }
-function resetInput() { buttons.clear(); pointer = { ...pointer, visible: false }; input(); }
+const browserInput = bindBrowserInput(canvas, () => state === 'running' && !!core?.capabilities?.wiiInput, input => {
+  if (core?.capabilities?.wiiInput) send({type:'input',input});
+});
+const resetInput = browserInput.reset;
 function refresh() {
   start.disabled = pending || !['ready', 'paused'].includes(state);
   start.textContent = state === 'paused' ? 'Fortsetzen' : 'Starten';
@@ -126,15 +127,7 @@ start.onclick = async () => {
 pause.onclick = () => { resetInput(); pending = true; refresh(); audio.clear(); send({ type: 'pause' }); };
 stop.onclick = () => { resetInput(); pending = true; refresh(); audio.clear(); send({ type: 'stop' }); };
 el('fullscreen').onclick = () => { void el('screen').requestFullscreen().catch(error => appendLog(`Vollbild: ${String(error)}`)); };
-const keymap: Record<string, Button> = { KeyX: 'A', KeyZ: 'B', Digit1: 'ONE', Digit2: 'TWO', Enter: 'PLUS', Minus: 'MINUS', KeyH: 'HOME', ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT' };
-canvas.addEventListener('keydown', event => { const button = keymap[event.code]; if (!button || state !== 'running') return; event.preventDefault(); buttons.add(button); input(); });
-canvas.addEventListener('keyup', event => { const button = keymap[event.code]; if (!button) return; event.preventDefault(); buttons.delete(button); input(); });
-canvas.addEventListener('blur', resetInput);
-window.addEventListener('blur', resetInput);
 document.addEventListener('visibilitychange', () => { if (document.hidden) { resetInput(); if (state === 'running') pause.click(); } });
-canvas.addEventListener('pointermove', event => { const rect = canvas.getBoundingClientRect(); pointer = { x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)), y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)), visible: true }; input(); });
-canvas.addEventListener('pointerleave', () => { pointer = { ...pointer, visible: false }; input(); });
-canvas.addEventListener('pointerdown', () => canvas.focus());
 for (const [label, available] of [ ['WebAssembly', 'WebAssembly' in window], ['Worker', 'Worker' in window], ['Geteilter Speicher', window.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined'] ] as const) {
   const item = document.createElement('li'); item.textContent = `${label}: ${available ? 'verfügbar' : 'nicht verfügbar'}`; el('capabilities').append(item);
 }

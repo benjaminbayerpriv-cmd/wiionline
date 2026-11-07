@@ -185,3 +185,4 @@ export async function createCore(emit: (event: CoreEvent) => void): Promise<Emul
 }
 
 export { loadSystemFonts } from './system-fonts';
+export { bindBrowserInput, imagePointer } from './browser-input';
