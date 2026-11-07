@@ -1,6 +1,7 @@
 # AV status (remote Claude: graphics, then audio)
 
 Upstream: `dolphin-emu/dolphin` @ `4a70679d0adcd17220568f5c18d2d4005eeea0a2` (docs/upstream.json, inspected read-only).
+Scope of findings: sections 1 and 2 were derived from source at the SHA above only (`4a70679d…`, the earlier candidate baseline). The core agent has since moved to `wasm-dolphin` @ Dolphin `e22551e…` with Emscripten 5.0.7 (full SHAs and patch origin pending on `claude/core-wasm`); **they must be re-verified against that revision before they are relied on.** Sections 3 and 4 do not depend on a Dolphin revision.
 Status: **assessment + isolated precheck only. No Dolphin code runs in a browser yet; no Wii-produced frame exists yet.**
 
 ## 1. Backend inventory (LOC = .cpp/.h in `Source/Core/VideoBackends/<dir>`; `VideoCommon` is 61k LOC and shared)
@@ -44,17 +45,17 @@ node scripts/av-probe.mjs                                   # default flags
 node scripts/av-probe.mjs graphics/results/api-probe-webgpu-flags.json -- \
   --enable-unsafe-webgpu --enable-features=Vulkan,WebGPU --use-webgpu-adapter=swiftshader --use-angle=swiftshader
 ```
-(needs `playwright`; in this container `NODE_PATH=/opt/node-tools/node_modules`.)
+(page: `graphics/experiments/api-probe/{index.html,probe.js}`; needs `playwright`; in this container `NODE_PATH=/opt/node-tools/node_modules`.)
 
 | Run | Browser / GPU | WebGL2 plain render | dual-source | WebGPU |
 |---|---|---|---|---|
 | `api-probe.json` | HeadlessChrome 153, Linux, SwiftShader (software), 4-core Xeon 2.1GHz | PASS (200,100,50,255) | **extension missing** | no adapter |
 | `api-probe-webgpu-flags.json` | same, with the flags above | PASS | missing | SwiftShader adapter; no `dual-source-blending`; `clip-distances` yes |
-| `api-probe-real-gpu.json` | Claude desktop browser (Chrome 152), Windows, RTX 4070 Ti SUPER, D3D11 | not run (limits/ext only) | extension **present** | adapter, `dual-source-blending` **yes** |
+| `api-probe-real-gpu.json` | Claude desktop browser (Chrome 152), Windows, RTX 4070 Ti SUPER, D3D11 | PASS | **PASS**: pixel (226,126,76,255), expected (225,125,75,255) ±2 | adapter, `dual-source-blending` **yes** (feature flag only, no WebGPU render test) |
 
-The real-GPU row is a one-off manual probe with a reduced script and no render test, so dual-source blending is confirmed *available* there but its blend output is not yet verified. `crossOriginIsolated` was false in that pane (COOP/COEP were not served), so threads/SharedArrayBuffer were not tested on real hardware.
+The real-GPU row was produced by pasting `probe.js` into the browser's JS console, so it is manual and not reproducible from CI. It verifies that WebGL2 dual-source blending (`src + dst*(1-src1)`) renders correctly on that GPU. `crossOriginIsolated` was false in that pane (no COOP/COEP served), so threads/SharedArrayBuffer were not tested on real hardware.
 
 ## 4. Blockers and limits
 - No Emscripten toolchain and no core build: step 3 (a frame from emulated homebrew) is blocked on the core agent's pinned Emscripten and a Dolphin WASM build. Nothing here is a Wii frame.
 - No real-GPU CI; the reproducible runs are software-rendered and cannot validate dual-source blending or performance.
-- Proposed next steps (need coordination): native Linux build of Dolphin at the pinned SHA with the Software/Null backend to capture a first homebrew frame as a reference image; dump the GLSL ES 3.00 Dolphin generates and compile it in WebGL2; define the Emscripten GL context hook with the core agent.
+- Proposed next steps (need coordination): adopt the core agent's final revision and toolchain, re-check sections 1 and 2 against it, then capture a first homebrew frame (native reference build only after the SHA is agreed); dump the GLSL ES 3.00 Dolphin generates and compile it in WebGL2; define the Emscripten GL context hook with the core agent.

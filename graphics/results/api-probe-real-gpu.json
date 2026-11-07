@@ -1,13 +1,64 @@
 {
-  "note": "Measured in the Claude desktop app built-in browser on the user's Windows machine via a one-off JS probe (same checks as graphics/experiments/api-probe, reduced; no render test). Not reproducible from CI.",
+  "note": "Measured in the Claude desktop app built-in browser on the user's Windows machine by pasting graphics/experiments/api-probe/probe.js (webgl2Probe render checks; WebGPU only adapter features, earlier run). Not reproducible from CI.",
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Claude/4.4212.0 Chrome/152.0.7977.167 Safari/537.36 MSIX",
   "hardwareConcurrency": 28,
   "crossOriginIsolated": false,
   "webgl2": {
     "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti SUPER, Direct3D11 vs_5_0 ps_5_0, D3D11)",
-    "extensions": {"WEBGL_blend_func_extended": true, "WEBGL_clip_cull_distance": true, "EXT_color_buffer_float": true, "EXT_texture_filter_anisotropic": true, "EXT_texture_compression_bptc": true, "KHR_parallel_shader_compile": true, "EXT_disjoint_timer_query_webgl2": true},
-    "MAX_UNIFORM_BLOCK_SIZE": 65536, "MAX_ARRAY_TEXTURE_LAYERS": 2048, "MAX_TEXTURE_SIZE": 16384
+    "extensions": {
+      "WEBGL_blend_func_extended": true,
+      "WEBGL_clip_cull_distance": true,
+      "EXT_color_buffer_float": true,
+      "EXT_texture_filter_anisotropic": true,
+      "EXT_texture_compression_bptc": true,
+      "KHR_parallel_shader_compile": true,
+      "EXT_disjoint_timer_query_webgl2": true
+    },
+    "MAX_UNIFORM_BLOCK_SIZE": 65536,
+    "MAX_ARRAY_TEXTURE_LAYERS": 2048,
+    "MAX_TEXTURE_SIZE": 16384,
+    "checks": {
+      "plain": {
+        "pixel": [
+          200,
+          100,
+          50,
+          255
+        ],
+        "expected": [
+          200,
+          100,
+          50,
+          255
+        ],
+        "pass": true
+      },
+      "dualSource": {
+        "pixel": [
+          226,
+          126,
+          76,
+          255
+        ],
+        "expected": [
+          225,
+          125,
+          75,
+          255
+        ],
+        "pass": true
+      }
+    }
   },
-  "webgpu": {"adapter": {"vendor": "nvidia", "architecture": "lovelace"}, "isFallbackAdapter": false, "dual-source-blending": true, "clip-distances": true, "maxTextureArrayLayers": 2048}
+  "webgpu": {
+    "adapter": {
+      "vendor": "nvidia",
+      "architecture": "lovelace"
+    },
+    "isFallbackAdapter": false,
+    "dual-source-blending": true,
+    "clip-distances": true,
+    "maxTextureArrayLayers": 2048
+  }
 }

@@ -15,10 +15,13 @@ const args = process.argv.slice(2);
 const sep = args.indexOf('--');
 const extra = sep >= 0 ? args.slice(sep + 1) : [];
 const outFile = resolve(root, (sep >= 0 ? args.slice(0, sep) : args)[0] ?? 'graphics/results/api-probe.json');
-const html = readFileSync(resolve(root, 'graphics/experiments/api-probe/index.html'));
+const dir = resolve(root, 'graphics/experiments/api-probe');
+const files = { '/': ['index.html', 'text/html'], '/probe.js': ['probe.js', 'text/javascript'] };
 const server = createServer((req, res) => {
-  res.writeHead(200, { 'content-type': 'text/html', 'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' });
-  res.end(html);
+  const f = files[req.url.split('?')[0]];
+  if (!f) { res.writeHead(404); res.end(); return; }
+  res.writeHead(200, { 'content-type': f[1], 'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' });
+  res.end(readFileSync(resolve(dir, f[0])));
 }).listen(0, '127.0.0.1');
 await new Promise(r => server.once('listening', r));
 const browser = await chromium.launch({ args: extra });
