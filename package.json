@@ -9,7 +9,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "tsx --test tests/*.test.ts && node scripts/av-test-frame-bridge.mjs",
     "core:install": "node scripts/install-core.mjs",
-    "test:browser:stage": "node scripts/av-stage-browser-tests.mjs"
+    "test:browser:stage": "node scripts/av-stage-browser-tests.mjs",
+    "test:browser:e2e": "node scripts/browser-e2e.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
