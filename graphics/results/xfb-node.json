@@ -1,0 +1,115 @@
+{
+  "verdict": true,
+  "environment": "Node actual WASM; not browser evidence",
+  "errors": [],
+  "build": "dolphin=e22551eae1c84a7e4d0b6a5c519ef4ed4ef69df1 emscripten=5.0.7",
+  "guestMarker": 1480999473,
+  "pc": "800040d4",
+  "isWii": 1,
+  "coreState": "Running",
+  "videoStats": "xfb:1 320x240 stride:640 present:320x240 hash:1743764d nz:2134 bp:0 cp:0 xf:0 prim:0 draw:0 rast:0 verts:0 pad polls:1 updates:0 input:0 gen:0 buttons:0 stick:128,128 fastsw:0 coreprof xfb_dt:0.0 avg:0.0 max:0.0 decode:0.5 avg:0.5 max:0.5 vo_sync:0.0/max0.0 vo_pub:0.0/max0.0 vo_total:0.0/max0.0 swxfb:0.0 conv:0.0 copy:0.0 sz:0x0->0 xfbfast:0 rowreuse:0 identitydecode:0 ogl_swap:0 worker:0 commit:0 bb:0x0 bits:0 rb:0x0 glerr:0x0",
+  "frameCounter": 1,
+  "bridge": {
+    "delivered": 1,
+    "torn": 0,
+    "skipped": 0,
+    "lastFrame": 1
+  },
+  "width": 320,
+  "height": 240,
+  "samples": [
+    {
+      "bar": 0,
+      "target": 0,
+      "rgba": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "bar": 1,
+      "target": 37,
+      "rgba": [
+        37,
+        37,
+        37,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "bar": 2,
+      "target": 75,
+      "rgba": [
+        75,
+        75,
+        75,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "bar": 3,
+      "target": 112,
+      "rgba": [
+        112,
+        112,
+        112,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "bar": 4,
+      "target": 149,
+      "rgba": [
+        149,
+        149,
+        149,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "bar": 5,
+      "target": 186,
+      "rgba": [
+        186,
+        186,
+        186,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "bar": 6,
+      "target": 224,
+      "rgba": [
+        224,
+        224,
+        224,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "bar": 7,
+      "target": 255,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "pass": true
+    }
+  ],
+  "elapsedMs": 405,
+  "nativeArtifacts": {
+    "dolphin-core-upstream.wasm": "5c420f1c5cc1fc326188106bbc64c67a615748f50c2e415fa47d740cc8930bec",
+    "dolphin-core-upstream.js": "17b792166f2a8a06ad64f5344f95c49debcc0fb645e8c9644c814a996a0a88c0"
+  }
+}

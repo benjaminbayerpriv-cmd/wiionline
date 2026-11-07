@@ -1,0 +1,40 @@
+{
+  "status": "generated; real core execution not yet verified",
+  "kind": "Wii VI/XFB scanout; not a GX rasterization test",
+  "source": "scripts/av-build-xfb-test.py (original code)",
+  "sha256": "584d24852c12766beed13387ce53b52f0e28f382f6a3fa48c8f6775e4a2006c1",
+  "bytes": 154080,
+  "width": 320,
+  "height": 240,
+  "xfb_address": 2148532224,
+  "result_address": 2416967680,
+  "guest_marker": 1480999473,
+  "end_loop_pc": 2147500244,
+  "yuyv_luma": [
+    16,
+    48,
+    80,
+    112,
+    144,
+    176,
+    208,
+    235
+  ],
+  "chroma_u": 128,
+  "chroma_v": 128,
+  "expected_rgb_gray_approx": [
+    0,
+    37,
+    75,
+    112,
+    149,
+    186,
+    224,
+    255
+  ],
+  "rgb_tolerance": 4,
+  "alpha": 255,
+  "sample_positions": "center of each of eight equal-width vertical bars at half image height",
+  "presentation": "320x240 at scale=1; 160x120 at default scale=0.5",
+  "evidence_gate": "guest marker + actual native frame generation + independent pixel comparison"
+}

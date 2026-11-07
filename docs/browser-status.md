@@ -9,3 +9,9 @@ Coordination: remote graphics branch claude/browser-av has an initial assessment
 ## Native adapter follow-up (codex/core-integration)
 
 Implemented the bridge to core ABI 1 with actual exported function names, small homebrew FS staging, asynchronous boot-state checking, pause/resume/stop and AV frame delivery. Imported the already-merged AV work from main. Added local native-artifact installer and a production adapter build. Eleven fixture/lifecycle tests and the AV contract test pass; none is a real emulation test. Native binaries and XFB-producing homebrew are still required for end-to-end verification. Wii input and native audio remain disconnected and are reported as such.
+
+## Real native integration verified
+
+Native artifacts were located on the Mac, installed with core:install, and the actual WASM core executed Codex's own VI/XFB DOL. Node checks passed guest marker, Wii mode, PC, 320x240 geometry and all eight grayscale samples. The same installed production app was tested in the in-app browser and displayed the real bars. Pause/resume/stop and a second load/start succeeded. Dark mode was requested and implemented. Results and artifact hashes: graphics/results/xfb-node.json. Browser exact pixel reads were not available via automation; browser evidence is observed image and lifecycle state.
+
+This supersedes earlier notes that real core output was unavailable. It does not establish games, GX rendering, input, audio or speed. The core agent has unpublished native fixes used by the locally successful build; publish those before claiming full clean-checkout reproducibility. The remote AV agent went offline and Codex took over the VI/XFB test.
