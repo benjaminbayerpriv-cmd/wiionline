@@ -1,0 +1,179 @@
+{
+ "when": "2026-11-07T22:27:07.419Z",
+ "node": "v22.23.1",
+ "passed": 34,
+ "total": 34,
+ "pass": true,
+ "results": [
+  {
+   "name": "emulierte Wiimote 0 vorhanden, PrepareInput liefert Ergebnis",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "Debug: Override aktiv, build_count zaehlt BuildDesiredWiimoteState",
+   "pass": true,
+   "detail": "active=1 builds=1"
+  },
+  {
+   "name": "Taste A: BuildDesired-hex und Verbindungs-Pfad",
+   "pass": true,
+   "detail": "build=0x800 pressed=0x800 erwartet 0x800"
+  },
+  {
+   "name": "Taste B: BuildDesired-hex und Verbindungs-Pfad",
+   "pass": true,
+   "detail": "build=0x400 pressed=0x400 erwartet 0x400"
+  },
+  {
+   "name": "Taste ONE: BuildDesired-hex und Verbindungs-Pfad",
+   "pass": true,
+   "detail": "build=0x200 pressed=0x200 erwartet 0x200"
+  },
+  {
+   "name": "Taste TWO: BuildDesired-hex und Verbindungs-Pfad",
+   "pass": true,
+   "detail": "build=0x100 pressed=0x100 erwartet 0x100"
+  },
+  {
+   "name": "Taste PLUS: BuildDesired-hex und Verbindungs-Pfad",
+   "pass": true,
+   "detail": "build=0x10 pressed=0x10 erwartet 0x10"
+  },
+  {
+   "name": "Taste MINUS: BuildDesired-hex und Verbindungs-Pfad",
+   "pass": true,
+   "detail": "build=0x1000 pressed=0x1000 erwartet 0x1000"
+  },
+  {
+   "name": "Taste HOME: BuildDesired-hex und Verbindungs-Pfad",
+   "pass": true,
+   "detail": "build=0x8000 pressed=0x8000 erwartet 0x8000"
+  },
+  {
+   "name": "Taste UP: BuildDesired-hex und Verbindungs-Pfad",
+   "pass": true,
+   "detail": "build=0x8 pressed=0x8 erwartet 0x8"
+  },
+  {
+   "name": "Taste DOWN: BuildDesired-hex und Verbindungs-Pfad",
+   "pass": true,
+   "detail": "build=0x4 pressed=0x4 erwartet 0x4"
+  },
+  {
+   "name": "Taste LEFT: BuildDesired-hex und Verbindungs-Pfad",
+   "pass": true,
+   "detail": "build=0x1 pressed=0x1 erwartet 0x1"
+  },
+  {
+   "name": "Taste RIGHT: BuildDesired-hex und Verbindungs-Pfad",
+   "pass": true,
+   "detail": "build=0x2 pressed=0x2 erwartet 0x2"
+  },
+  {
+   "name": "alle 11 Tasten",
+   "pass": true,
+   "detail": "0x9f1f"
+  },
+  {
+   "name": "unbekannte Bits ignoriert",
+   "pass": true,
+   "detail": "0x0"
+  },
+  {
+   "name": "IR Mitte: zwei Punkte im 1024x768-Bild",
+   "pass": true,
+   "detail": "[{\"x\":580,\"y\":452,\"s\":1},{\"x\":443,\"y\":452,\"s\":1}]"
+  },
+  {
+   "name": "IR links-oben: zwei Punkte im 1024x768-Bild",
+   "pass": true,
+   "detail": "[{\"x\":886,\"y\":207,\"s\":1},{\"x\":742,\"y\":211,\"s\":1}]"
+  },
+  {
+   "name": "IR rechts-oben: zwei Punkte im 1024x768-Bild",
+   "pass": true,
+   "detail": "[{\"x\":281,\"y\":211,\"s\":1},{\"x\":137,\"y\":207,\"s\":1}]"
+  },
+  {
+   "name": "IR links-unten: zwei Punkte im 1024x768-Bild",
+   "pass": true,
+   "detail": "[{\"x\":887,\"y\":706,\"s\":1},{\"x\":741,\"y\":698,\"s\":1}]"
+  },
+  {
+   "name": "IR rechts-unten: zwei Punkte im 1024x768-Bild",
+   "pass": true,
+   "detail": "[{\"x\":282,\"y\":698,\"s\":1},{\"x\":136,\"y\":706,\"s\":1}]"
+  },
+  {
+   "name": "IR Mitte: Schwerpunkt nahe Kameramitte (512,384)",
+   "pass": true,
+   "detail": "(511.5,452)"
+  },
+  {
+   "name": "IR: Zeiger rechts -> Punkte links (Spiegelung)",
+   "pass": true,
+   "detail": "rechts=209 mitte=511.5 links=814"
+  },
+  {
+   "name": "IR: Zeiger oben -> kleineres Kamera-y (Dolphin-Konvention), unten -> groesseres",
+   "pass": true,
+   "detail": "oben=209 mitte=452 unten=702"
+  },
+  {
+   "name": "IR: Punktabstand ca. konstant",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "visible=0 -> keine IR-Punkte",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "NaN-Zeiger -> unsichtbar",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "Zeiger ausserhalb 0..1 wird auf den Rand geklemmt",
+   "pass": true,
+   "detail": "[{\"x\":281,\"y\":211,\"s\":1},{\"x\":137,\"y\":207,\"s\":1}]"
+  },
+  {
+   "name": "Beschleunigung neutral (0,0,1): x=y=Nullpunkt, z=1 g darueber",
+   "pass": true,
+   "detail": "acc=512,512,616"
+  },
+  {
+   "name": "x=+1 g erhoeht Rohwert x, y/z unveraendert",
+   "pass": true,
+   "detail": "acc=616,512,616"
+  },
+  {
+   "name": "NaN-Beschleunigung -> neutral",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "Beschleunigung wird begrenzt (10-Bit-Bereich)",
+   "pass": true,
+   "detail": "acc=1023,0,1023"
+  },
+  {
+   "name": "ungueltiger Slot ohne Wirkung, Debug/Test liefern 0",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "Clear: Override inaktiv, Zaehler zurueck",
+   "pass": true,
+   "detail": "active=0 mask=0 builds=0"
+  },
+  {
+   "name": "Clear: keine gehaltene Taste im echten Pfad (Dolphin-Konfiguration gilt wieder)",
+   "pass": true,
+   "detail": "hex=0x0 pressed=0x0"
+  }
+ ]
+}

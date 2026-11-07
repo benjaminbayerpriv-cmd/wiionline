@@ -14,9 +14,9 @@
   },
   "patches": {
     "directory": "native/patches",
-    "count": 66,
+    "count": 67,
     "origin": "https://github.com/dougchansan/wasm-dolphin (GPLv2+), Commit 7e38409, patches/dolphin-wasm/{snapshot,submodules}; unveraendert uebernommen, Reihenfolge und SHA-256 in native/upstream-source.lock.json",
-    "note": "Der Satz enthaelt Kern/Boot/Speicher (0001, 0054, ...), den PPC-WASM-JIT (0003, 0066, 0067) und viele Grafik-/WebGPU-Patches (0004-0006, 0011-0065) die dem Grafik-Zweig gehoeren. Aenderungen an Grafik-Patches mit claude/browser-av abstimmen.",
+    "note": "Der Satz enthaelt Kern/Boot/Speicher (0001, 0054, ...), den PPC-WASM-JIT (0003, 0066, 0067) und viele Grafik-/WebGPU-Patches (0004-0006, 0011-0065) die dem Grafik-Zweig gehoeren. Aenderungen an Grafik-Patches mit claude/browser-av abstimmen. Patch 0068-web-wiimote-input ist eigen (Kern-Zweig), nicht aus wasm-dolphin.",
     "license": "native/LICENSE.wasm-dolphin"
   },
   "build": "scripts/core-build.sh all"

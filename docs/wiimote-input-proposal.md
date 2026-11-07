@@ -1,6 +1,8 @@
 # Vorschlag: echte Wiimote-Eingabe im Kern (zur Abstimmung mit Codex)
 
-Stand: Entwurf, **nichts davon ist implementiert oder getestet**. Gelesen wurde Dolphin `e22551e` (`WiimoteEmu.cpp`, `Camera.cpp`, `DesiredWiimoteState.h`, `WiimoteSettings.cpp`).
+Stand: umgesetzt, siehe `docs/core-status.md` (Abschnitt Wiimote-Eingabe). Dieses Dokument bleibt als Entwurf/Begründung; maßgeblich sind Status-Doku und Patch 0068. Die Testmethode weicht ab: Der Gast-BT-Pfad ist ohne libogc-Homebrew nicht erreichbar, getestet wird `Wiimote::PrepareInput` direkt.
+
+Ursprünglicher Entwurfsstand: Gelesen wurde Dolphin `e22551e` (`WiimoteEmu.cpp`, `Camera.cpp`, `DesiredWiimoteState.h`, `WiimoteSettings.cpp`).
 
 ## Befund
 - `SetInputMask`/`SetInputState` des Altbestands treiben **kein** GC-Pad und keine Wiimote: Der Zustand fließt nur in das synthetische Metadaten-Bild (`RenderMetadataFrame`). Sie sind für die Wii-Eingabe wertlos und werden nicht umetikettiert.

@@ -38,6 +38,7 @@
 #include "Core/HW/EXI/EXI_Device.h"
 #include "Core/HW/GCKeyboard.h"
 #include "Core/HW/GCPad.h"
+#include "Core/HW/Wiimote.h"
 #include "Core/HW/SystemTimers.h"
 #include "Core/Host.h"
 #include "Core/PowerPC/PowerPC.h"
@@ -646,6 +647,9 @@ void EnsureRuntime()
   Pad::Initialize();
   Pad::InitializeGBA();
   Keyboard::Initialize();
+  // wiionline: ohne diesen Aufruf existieren keine emulierten Wiimotes (UICommon::InitControllers tut es
+  // sonst); BT-HLE fuer das Gastsystem und der Web-Eingabepfad haengen daran. Kein Host-Bluetooth.
+  Wiimote::Initialize(Wiimote::InitializeMode::DO_NOT_WAIT_FOR_WIIMOTES);
 
   // §27 savestate-load backend resync. Probe evidence: after
   // State::Load the WebGPU command-ring producer (the dual-core GPU
