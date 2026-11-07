@@ -50,4 +50,4 @@ Generate the original test with `python3 scripts/av-build-xfb-test.py`. Load `gr
 
 The actual WASM integration runner is `node scripts/av-verify-xfb.mjs /path/to/dist-core /path/to/results`. It checks guest MEM2 marker, Wii mode, loop PC, frame geometry and all eight sampled grayscale values. Recorded result: [graphics/results/xfb-node.json](graphics/results/xfb-node.json). See [graphics/homebrew/README.md](graphics/homebrew/README.md) for scope and source references. The same DOL was then displayed in the in-app browser using the production build and exercised through pause/resume/stop/reload.
 
-The successful local native build includes the core agent's in-progress include fix; ensure that fix is published on `claude/core-wasm` before claiming a clean checkout reproduces the build. Native artifact hashes are recorded with the result.
+The core agent has now published the native fixes and CPU evidence on `claude/core-wasm` (0d9a73a, followed by 06485f2). The published native core source hash matches the local source used here. A full build from an empty directory remains unverified. Native artifact hashes are recorded with the result.
