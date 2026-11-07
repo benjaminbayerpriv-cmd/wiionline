@@ -41,6 +41,7 @@ let worker: Worker | undefined;
 let state: EmulatorState = 'idle';
 let core: CoreInfo | undefined;
 let pending = false;
+let starting = false;
 let hasFrame = false;
 const buttons = new Set<Button>();
 let pointer = { x: 0.5, y: 0.5, visible: false };
@@ -65,6 +66,7 @@ function clearScreen() { hasFrame = false; context?.clearRect(0, 0, canvas.width
 function receive(event: CoreEvent) {
   if (event.type === 'status' || event.type === 'error') {
     pending = false;
+    starting = false;
     state = event.type === 'error' ? 'error' : event.state;
     if (event.type === 'status' && event.core) {
       core = event.core;
@@ -76,11 +78,12 @@ function receive(event: CoreEvent) {
     el('status').classList.toggle('error', event.type === 'error');
     appendLog(`${event.type}: ${event.message}`);
     if (['paused', 'idle', 'error'].includes(state)) { resetInput(); audio.clear(); }
-    if (state === 'idle' || (state === 'loading' && core)) clearScreen();
+    if (state === 'idle' || state === 'error' || (state === 'loading' && core)) clearScreen();
     refresh();
   } else if (event.type === 'log') appendLog(event.message);
   else if (event.type === 'frame') {
-    if (state !== 'running') return;
+    // A native start can produce its first frame before its promise resolves.
+    if (state !== 'running' && !starting) return;
     const { width, height, rgba } = event;
     if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 4096 || height > 4096 || rgba.byteLength !== width * height * 4) { appendLog('Ungültiges Bildformat vom Kern.'); return; }
     if (canvas.width !== width) canvas.width = width;
@@ -88,7 +91,7 @@ function receive(event: CoreEvent) {
     context?.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
     hasFrame = true;
     el('empty').hidden = true;
-  } else if (event.type === 'audio' && state === 'running') audio.play(event.pcm, event.sampleRate);
+  } else if (event.type === 'audio' && (state === 'running' || starting)) audio.play(event.pcm, event.sampleRate);
   else if (event.type === 'metrics' && state === 'running') el('status').textContent = `Emulation läuft: ${event.fps.toFixed(1)} FPS, ${(event.emulationSpeed * 100).toFixed(0)} % Geschwindigkeit`;
 }
 function initialize() {
@@ -116,6 +119,7 @@ start.onclick = async () => {
   pending = true; refresh();
   try { await audio.enable(); }
   catch (error) { appendLog(`Tonausgabe nicht verfügbar: ${String(error)}`); }
+  starting = true;
   send({ type: 'start' }); canvas.focus();
 };
 pause.onclick = () => { resetInput(); pending = true; refresh(); audio.clear(); send({ type: 'pause' }); };
