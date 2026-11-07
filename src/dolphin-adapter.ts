@@ -1,4 +1,5 @@
 import type { CoreEvent, EmulatorCore, InputState } from './protocol';
+import { createAudioBridge } from './native-audio';
 import { neutralInput, wiimoteArguments } from './wiimote-input';
 import { createFrameBridge } from '../graphics/bridge/frame-bridge.mjs';
 
@@ -21,6 +22,8 @@ export class DolphinAdapter implements EmulatorCore {
   private lastStatus = '';
   private frameBridge?: ReturnType<typeof createFrameBridge>;
   private frameAtBoot = 0;
+  private audioBridge?: ReturnType<typeof createAudioBridge>;
+  private audioClock = 0;
   constructor(private module: DolphinModule, private emit: (event: CoreEvent) => void) {
     for (const name of required) {
       if (typeof module[`_${name}`] !== 'function') throw new Error(`Im WASM-Kern fehlt der Export ${name}.`);
@@ -30,12 +33,17 @@ export class DolphinAdapter implements EmulatorCore {
     this.requireOne('SetCpuCore', ['string'], ['interpreter']);
     this.requireOne('SetCpuThread', ['number'], [1]);
     this.requireOne('CoreInit');
+    this.audioBridge = createAudioBridge(module);
+    if (this.audioBridge) {
+      this.requireOne('SetAudioMuted', ['number'], [0]);
+      this.info.capabilities.audio = true;
+    }
     this.info.capabilities.wiiInput = typeof module._WiiOnline_SetWiimote === 'function' && typeof module._WiiOnline_ClearWiimote === 'function';
     if (module.HEAPU8 instanceof Uint8Array && ['FrameWidth', 'FrameHeight', 'FrameBuffer', 'GetFrame'].every(name => typeof module[`_${name}`] === 'function')) {
       this.frameBridge = createFrameBridge(module);
       this.info.capabilities.video = true;
     }
-    this.emit({ type: 'log', message: `Native Kern-ABI 1 initialisiert. Experimentelle Software-Bildausgabe; Wii-Input-Exporte ${this.info.capabilities.wiiInput ? 'verfügbar (Gastnachweis separat erforderlich)' : 'fehlen noch'}; Audio ist noch nicht verbunden.` });
+    this.emit({ type: 'log', message: `Native Kern-ABI 1 initialisiert. Experimentelle Software-Bildausgabe; Wii-Input-Exporte ${this.info.capabilities.wiiInput ? 'verfügbar (Gastnachweis separat erforderlich)' : 'fehlen noch'}; PCM-Brücke ${this.info.capabilities.audio ? 'verfügbar (hörbarer Gastton noch separat zu prüfen)' : 'nicht verfügbar'}.` });
   }
   private number(name: string, types: string[] = [], values: unknown[] = []) {
     return Number(this.module.ccall(name, 'number', types, values));
@@ -92,11 +100,18 @@ export class DolphinAdapter implements EmulatorCore {
   }
   private startPump() {
     if (this.timer) return;
+    this.audioClock = performance.now();
     this.timer = setInterval(() => {
       try {
         this.pump();
         const state = this.text('GetCoreStateName');
         if (state === 'Uninitialized' || state === 'Stopping') throw new Error(`Der native Kern wurde beendet: ${this.text('GetCoreStatus')}`);
+        const now = performance.now();
+        if (state === 'Running' && this.audioBridge) {
+          const audio = this.audioBridge.read(now - this.audioClock);
+          if (audio) this.emit(audio);
+        }
+        this.audioClock = now;
       }
       catch (error) {
         this.clearPump();

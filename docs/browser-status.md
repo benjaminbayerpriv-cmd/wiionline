@@ -17,3 +17,7 @@ Native artifacts were located on the Mac, installed with core:install, and the a
 This supersedes earlier notes that real core output was unavailable. It does not establish games, GX rendering, input, audio or speed. The core agent has unpublished native fixes used by the locally successful build; publish those before claiming full clean-checkout reproducibility. The remote AV agent went offline and Codex took over the VI/XFB test.
 
 Native source publication update: the core agent pushed 0d9a73a and 06485f2. The SHA-256 of native/src/dolphin_web_core.cpp on that branch matches the local source (8c057ba3…e9c21). The source-fix publication blocker is resolved. A full build from an empty directory remains unverified.
+
+## Parallel audio work
+
+While the native agent develops Wiimote input, Codex connected native MixAudio/AudioBuffer stereo int16 output to transferable float32 PCM chunks. Sixteen tests plus production build pass. A real installed-core run delivered 12 chunks at 48 kHz from the silent grayscale DOL; all samples were zero as expected. This verifies native mixer transport, not audible guest audio or browser speaker output. Result: graphics/results/audio-transport-node.json. Wiimote native work and browser audio work have separate owners and do not block each other.

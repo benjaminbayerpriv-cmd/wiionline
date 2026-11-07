@@ -1,0 +1,10 @@
+{
+  "audioSupported": true,
+  "chunks": 12,
+  "sampleRates": [
+    48000
+  ],
+  "frames": 12022,
+  "nonZeroSamples": 0,
+  "scope": "Actual native mixer and adapter transport; grayscale homebrew is silent, no audible guest-sound proof"
+}
