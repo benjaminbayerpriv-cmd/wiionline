@@ -5,3 +5,5 @@ dist/
 public/core/*.wasm
 public/core/*.js
 public/core/*.data
+.core-work/
+dist-core/

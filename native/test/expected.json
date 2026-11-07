@@ -1,0 +1,10 @@
+{
+ "magic": "WIIONLIN",
+ "sum": 500500,
+ "lcg": 4089345937,
+ "done": 1146048069,
+ "result_addr": 2416967680,
+ "entry": 2147500032,
+ "end_loop_pc": 2147500148,
+ "sha256": "aa6ecf389815cc20f6f349803209b8c8fc1546d7d20be5ab2f55412503080dfc"
+}
