@@ -1,5 +1,4 @@
 import type { CoreEvent, EmulatorCore, InputState } from './protocol';
-import { PerformanceMeter } from './performance-meter';
 import { loadSystemFonts } from './system-fonts';
 import { mountRvz, supportsDiscFiles } from './disc-file';
 import { createAudioBridge } from './native-audio';
@@ -28,7 +27,6 @@ export class DolphinAdapter implements EmulatorCore {
   private frameAtBoot = 0;
   private audioBridge?: ReturnType<typeof createAudioBridge>;
   private audioClock = 0;
-  private meter = new PerformanceMeter();
   constructor(private module: DolphinModule, private emit: (event: CoreEvent) => void) {
     for (const name of required) {
       if (typeof module[`_${name}`] !== 'function') throw new Error(`Im WASM-Kern fehlt der Export ${name}.`);
@@ -125,7 +123,6 @@ export class DolphinAdapter implements EmulatorCore {
   private startPump() {
     if (this.timer) return;
     this.audioClock = performance.now();
-    this.meter = new PerformanceMeter();
     this.timer = setInterval(() => {
       try {
         this.pump();
@@ -137,15 +134,7 @@ export class DolphinAdapter implements EmulatorCore {
           if (audio) this.emit(audio);
         }
         this.audioClock = now;
-        if (['GetFrame','GetCoreTicksLow','GetCoreTicksHigh','GetCoreTicksPerSecond'].every(name=>typeof this.module[`_${name}`]==='function')) {
-          let high=this.number('GetCoreTicksHigh')>>>0;
-          let low=this.number('GetCoreTicksLow')>>>0;
-          const check=this.number('GetCoreTicksHigh')>>>0;
-          if (high!==check) {high=check;low=this.number('GetCoreTicksLow')>>>0;}
-          const ticks=(BigInt(high)<<32n)|BigInt(low);
-          const metric=this.meter.sample(now,this.number('GetFrame')>>>0,ticks,this.number('GetCoreTicksPerSecond'));
-          if(metric) this.emit(metric);
-        }
+
       }
       catch (error) {
         this.clearPump();

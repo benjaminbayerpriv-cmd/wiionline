@@ -27,3 +27,7 @@ While the native agent develops Wiimote input, Codex connected native MixAudio/A
 Installed and independently checked the core agent's 542c23a artifacts: JS bd1555ab1bde3fef0d91feb321f23f3692dd75b9c0b9021e03b6fbe40af9ac3d, WASM ef97f9fb779907502bb8277232cfe09330280516a557e79d14d17fa43e014ddb. Browser adapter now detects the real Wiimote exports. Guest input proof remains open.
 
 User supplied Wii Play (Europe, Rev 1).rvz, 167047716 bytes, correct RVZ magic. The WORKERFS path mounted it, BootDisc reached Running, and the in-app browser displayed the actual wrist-strap safety screen. That establishes RVZ read/boot/first image for this title, not gameplay, control response or full speed. The initial interpreter run logged a missing Windows-1252 font warning; bundled Dolphin replacement fonts and Cached+WASM-JIT are being tested in the follow-up run. Twenty unit/adapter tests pass; no game data is committed.
+
+## Performance-claim correction
+
+User observed that the reported FPS and 100% speed do not match visible game behavior. Codex had labeled native VI/XFB publication cadence as game FPS and a timer-derived ratio as game speed. Those signals were not validated against actual guest-rendered frames or observed game time, so the quantitative UI display and the speed claim have been withdrawn. Cached+JIT is enabled, but real gameplay speed remains unverified and visible slowdown remains open. Repeated scanout of the same XFB must not count as new game-rendered frames.

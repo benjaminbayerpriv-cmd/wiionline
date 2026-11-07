@@ -93,7 +93,7 @@ function receive(event: CoreEvent) {
     hasFrame = true;
     el('empty').hidden = true;
   } else if (event.type === 'audio' && (state === 'running' || starting)) audio.play(event.pcm, event.sampleRate);
-  else if (event.type === 'metrics' && state === 'running') el('status').textContent = `Emulation läuft: ${event.fps.toFixed(1)} FPS, ${(event.emulationSpeed * 100).toFixed(0)} % Geschwindigkeit`;
+  else if (event.type === 'metrics') { /* Performance claims require a validated native measurement path. */ }
 }
 function initialize() {
   if (!('Worker' in window) || !('WebAssembly' in window)) { receive({ type: 'error', code: 'BROWSER_UNSUPPORTED', message: 'Dieser Browser unterstützt die benötigten Worker und WebAssembly nicht.' }); return; }
