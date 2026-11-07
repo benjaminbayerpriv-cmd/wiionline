@@ -1,4 +1,5 @@
 import type { CoreEvent, EmulatorCore, InputState } from './protocol';
+import { neutralInput, wiimoteArguments } from './wiimote-input';
 import { createFrameBridge } from '../graphics/bridge/frame-bridge.mjs';
 
 export interface DolphinModule {
@@ -29,11 +30,12 @@ export class DolphinAdapter implements EmulatorCore {
     this.requireOne('SetCpuCore', ['string'], ['interpreter']);
     this.requireOne('SetCpuThread', ['number'], [1]);
     this.requireOne('CoreInit');
+    this.info.capabilities.wiiInput = typeof module._WiiOnline_SetWiimote === 'function' && typeof module._WiiOnline_ClearWiimote === 'function';
     if (module.HEAPU8 instanceof Uint8Array && ['FrameWidth', 'FrameHeight', 'FrameBuffer', 'GetFrame'].every(name => typeof module[`_${name}`] === 'function')) {
       this.frameBridge = createFrameBridge(module);
       this.info.capabilities.video = true;
     }
-    this.emit({ type: 'log', message: 'Native Kern-ABI 1 initialisiert. Experimentelle Software-Bildausgabe; Wii-Eingaben und Audio sind noch nicht verbunden.' });
+    this.emit({ type: 'log', message: `Native Kern-ABI 1 initialisiert. Experimentelle Software-Bildausgabe; Wii-Input-Exporte ${this.info.capabilities.wiiInput ? 'verfügbar (Gastnachweis separat erforderlich)' : 'fehlen noch'}; Audio ist noch nicht verbunden.` });
   }
   private number(name: string, types: string[] = [], values: unknown[] = []) {
     return Number(this.module.ccall(name, 'number', types, values));
@@ -70,6 +72,7 @@ export class DolphinAdapter implements EmulatorCore {
   async start() {
     if (this.booted) { this.requireOne('SetCorePaused', ['number'], [0]); this.startPump(); return; }
     if (!this.path) throw new Error('Keine Homebrew-Datei vorbereitet.');
+    this.input(neutralInput());
     this.frameAtBoot = this.frameBridge ? this.number('GetFrame') >>> 0 : 0;
     if (this.frameBridge) this.frameBridge.stats.lastFrame = this.frameAtBoot;
     this.requireOne('BootDisc', ['string'], [this.path]);
@@ -103,17 +106,20 @@ export class DolphinAdapter implements EmulatorCore {
   }
   private clearPump() { if (this.timer) clearInterval(this.timer); this.timer = undefined; }
   async pause() {
+    this.input(neutralInput());
     this.requireOne('SetCorePaused', ['number'], [1]);
     this.clearPump();
   }
   async stop() {
     this.clearPump();
+    if (this.info.capabilities.wiiInput) this.module.ccall('WiiOnline_ClearWiimote', null, ['number'], [0]);
     if (this.booted) this.module.ccall('StopCore', null, [], []);
     this.booted = false;
     if (this.path) { this.module.FS.unlink(this.path); this.path = undefined; }
   }
-  input(_input: InputState) {
-    // SetInputState in this native revision is GameCube-only. Do not map Wii keys to it.
+  input(input: InputState) {
+    if (!this.info.capabilities.wiiInput) return;
+    this.module.ccall('WiiOnline_SetWiimote', null, Array(8).fill('number'), wiimoteArguments(input));
   }
 }
 

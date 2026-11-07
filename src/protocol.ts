@@ -1,7 +1,7 @@
 /** Shared browser/worker contract v1. Changes require coordination with both core agents. */
 export type EmulatorState = 'idle' | 'loading' | 'ready' | 'running' | 'paused' | 'error';
 export type Button = 'A' | 'B' | 'ONE' | 'TWO' | 'PLUS' | 'MINUS' | 'HOME' | 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
-export type InputState = { buttons: Button[]; pointer: { x: number; y: number; visible: boolean } };
+export type InputState = { buttons: Button[]; pointer: { x: number; y: number; visible: boolean }; accel?: { x: number; y: number; z: number } };
 export type Command =
   | { type: 'init' }
   | { type: 'load'; file: File }

@@ -69,3 +69,25 @@ test('metadata is suppressed and only newly published native frames are forwarde
   assert.deepEqual([...new Uint8Array(frames[0].rgba)], [12, 34, 56, 255]);
   assert.ok(!f.calls.includes('RunFrame'), 'adapter must never manufacture native frames');
 });
+
+test('Wiimote adapter neutralizes on pause and clears its override on stop', async () => {
+  const f = fixture();
+  f.module._WiiOnline_SetWiimote = () => {};
+  f.module._WiiOnline_ClearWiimote = () => {};
+  const inputs: unknown[][] = [];
+  const base = f.module.ccall;
+  f.module.ccall = (name, result, types, values) => {
+    if (name === 'WiiOnline_SetWiimote') inputs.push(values);
+    return base(name, result, types, values);
+  };
+  const adapter = f.create();
+  assert.equal(adapter.info.capabilities.wiiInput, true);
+  await adapter.load(homebrew); await adapter.start();
+  adapter.input({buttons:['A','HOME','RIGHT'],pointer:{x: .25,y: .75,visible:true}});
+  assert.deepEqual(inputs.at(-1), [0, 0x441, .25, .75, 1, 0, 0, 1]);
+  await adapter.pause();
+  assert.deepEqual(inputs.at(-1), [0, 0, .5, .5, 0, 0, 0, 1]);
+  await adapter.stop();
+  assert.ok(f.calls.includes('WiiOnline_ClearWiimote'));
+  assert.ok(!f.calls.includes('SetInputState'));
+});
