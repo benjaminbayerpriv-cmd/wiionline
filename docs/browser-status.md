@@ -21,3 +21,9 @@ Native source publication update: the core agent pushed 0d9a73a and 06485f2. The
 ## Parallel audio work
 
 While the native agent develops Wiimote input, Codex connected native MixAudio/AudioBuffer stereo int16 output to transferable float32 PCM chunks. Sixteen tests plus production build pass. A real installed-core run delivered 12 chunks at 48 kHz from the silent grayscale DOL; all samples were zero as expected. This verifies native mixer transport, not audible guest audio or browser speaker output. Result: graphics/results/audio-transport-node.json. Wiimote native work and browser audio work have separate owners and do not block each other.
+
+## RVZ and updated native build
+
+Installed and independently checked the core agent's 542c23a artifacts: JS bd1555ab1bde3fef0d91feb321f23f3692dd75b9c0b9021e03b6fbe40af9ac3d, WASM ef97f9fb779907502bb8277232cfe09330280516a557e79d14d17fa43e014ddb. Browser adapter now detects the real Wiimote exports. Guest input proof remains open.
+
+User supplied Wii Play (Europe, Rev 1).rvz, 167047716 bytes, correct RVZ magic. The WORKERFS path mounted it, BootDisc reached Running, and the in-app browser displayed the actual wrist-strap safety screen. That establishes RVZ read/boot/first image for this title, not gameplay, control response or full speed. The initial interpreter run logged a missing Windows-1252 font warning; bundled Dolphin replacement fonts and Cached+WASM-JIT are being tested in the follow-up run. Twenty unit/adapter tests pass; no game data is committed.

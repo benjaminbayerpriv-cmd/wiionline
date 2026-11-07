@@ -31,3 +31,9 @@ Single-buffer copying is a prototype limitation: a frame counter incremented aft
 ## Wiimote agreement with core agent (a04af6e proposal)
 
 InputState gains optional `accel: {x,y,z}` in g units, default (0,0,1). Only the worker adapter calls native ccall, using the agreed 8-argument WiiOnline_SetWiimote export for slot 0. Pointer remains normalized top-left origin; visible=false disables IR. The first scope is eleven buttons plus IR, without extensions. Native agent uses Dolphin defaults for camera geometry and documents them. Input is supported only when both new Set/Clear exports exist; the old GameCube/metadata SetInputState is never used. Pause/focus loss sends a neutral active override; stop clears it. Native debug and full guest-read tests are separate gates, not proven by the adapter fixture.
+
+## RVZ file path and measured speed
+
+RVZ is advertised only when the module provides WORKERFS and mount/unmount APIs. The adapter checks the four-byte RVZ signature, then mounts the original File as /wiionline-disc/disc.rvz using WORKERFS blobs. It never calls the whole-file arrayBuffer() method for RVZ. The title must be stopped before unmount; stop unloads core readers, then removes the mount and directory. Homebrew retains the 64 MiB MEMFS limit; RVZ does not inherit that limit.
+
+Default CPU is Cached Interpreter, with the inherited PPC-to-WASM JIT enabled when exported. Software rendering is still the output backend. Performance display uses changes in native frame count and native emulated ticks divided by wall time (one-second samples); it is not a UI timer animation or a speed guarantee. Font assets from the same Dolphin source revision are supplied with their upstream Apache notice, then loaded into /dolphin-sys/GC before CoreInit.
