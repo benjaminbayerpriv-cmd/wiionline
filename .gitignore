@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.local/
+.DS_Store
+public/core/*.wasm
+public/core/*.js
+public/core/*.data

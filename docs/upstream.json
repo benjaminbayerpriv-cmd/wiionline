@@ -1,0 +1,1 @@
+{"repository":"https://github.com/dolphin-emu/dolphin.git","revision":"4a70679d0adcd17220568f5c18d2d4005eeea0a2","status":"candidate baseline; browser build not yet verified","toolchain":"core agent must select and pin Emscripten before AV integration"}
