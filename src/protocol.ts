@@ -7,7 +7,7 @@ export type Command =
   | { type: 'load'; file: File }
   | { type: 'start' | 'pause' | 'stop' }
   | { type: 'input'; input: InputState };
-export type CoreInfo = { name: string; revision: string; formats: string[] };
+export type CoreInfo = { name: string; revision: string; formats: string[]; capabilities?: { wiiInput: boolean; video: boolean; audio: boolean } };
 export type CoreEvent =
   | { type: 'status'; state: EmulatorState; message: string; core?: CoreInfo }
   | { type: 'log'; message: string }

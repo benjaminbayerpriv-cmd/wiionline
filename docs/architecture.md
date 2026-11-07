@@ -19,3 +19,11 @@ Serve HTTPS (localhost is suitable for development), application/wasm and COOP s
 Acceptance gates: reproducible toolchain → actual Wii homebrew CPU trace → actual rendered frame → input response → synchronized sound → measured performance and game compatibility. Browser shell tests do not prove emulation.
 
 Runtime owns lifecycle status events; adapters should emit frame/audio/log/metrics/error, not independently change wrapper states. Fatal asynchronous native errors are preserved even when a command promise resolves. Use stop to recover if the initialized core can unload safely; otherwise reload the page.
+
+## Implemented core integration
+
+Codex implements the JS adapter in `src/dolphin-adapter.ts`; the core agent owns native exports/build output. `public/core/adapter.js` is only the Vite development entry. The library build replaces it in `dist/core/adapter.js`. Import real artifacts with `npm run core:install -- <dist-core>`.
+
+`CoreInfo.capabilities` optionally reports `wiiInput`, `video`, and `audio`. The UI forwards input only if `wiiInput` is explicitly true. The first adapter supports small DOL/ELF files, interpreter CPU, Software renderer, and the AV frame bridge. It never calls `RunFrame` or emits metadata/FPS. Before each boot it records the native frame generation and forwards only a new positive generation. Native `SetInputState` is GC-pad-only in the pinned revision and is deliberately not bound to Wii input.
+
+Single-buffer copying is a prototype limitation: a frame counter incremented after decode cannot prove the writer was idle during a copy, even when the counter remains unchanged. Counter mismatch drops only detectable overlaps. Do not claim a tear-free snapshot until native synchronization/double buffering is implemented.

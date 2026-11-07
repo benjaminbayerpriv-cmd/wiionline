@@ -5,3 +5,4 @@ dist/
 public/core/*.wasm
 public/core/*.js
 public/core/*.data
+!public/core/adapter.js

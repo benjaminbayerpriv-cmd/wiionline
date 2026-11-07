@@ -20,7 +20,7 @@ app.innerHTML = `
       <section class="file-panel"><h2>Software öffnen</h2><p>Wähle eine Datei von deinem Computer. Sie wird nicht hochgeladen.</p>
       <label class="file-button" id="file-label" aria-disabled="true">Datei auswählen<input id="file" type="file" disabled></label>
       <p id="filename">Noch keine Datei ausgewählt</p><p id="formats" class="detail">Formate werden vom Kern gemeldet.</p></section>
-      <section><h2>Steuerung</h2><dl class="keys"><div><dt>A / B</dt><dd><kbd>X</kbd> <kbd>Z</kbd></dd></div><div><dt>Steuerkreuz</dt><dd>Pfeiltasten</dd></div><div><dt>1 / 2</dt><dd><kbd>1</kbd> <kbd>2</kbd></dd></div><div><dt>Plus / Minus</dt><dd><kbd>Enter</kbd> <kbd>−</kbd></dd></div><div><dt>Home</dt><dd><kbd>H</kbd></dd></div><div><dt>Zeiger</dt><dd>Maus im Spielbild</dd></div></dl><p class="detail">Zum Steuern zuerst ins Spielbild klicken. Bewegungssensoren werden noch nicht unterstützt.</p></section>
+      <section><h2>Steuerung</h2><p id="input-status" class="detail">Wii-Steuerung noch nicht mit einem Kern verbunden.</p><dl class="keys"><div><dt>A / B</dt><dd><kbd>X</kbd> <kbd>Z</kbd></dd></div><div><dt>Steuerkreuz</dt><dd>Pfeiltasten</dd></div><div><dt>1 / 2</dt><dd><kbd>1</kbd> <kbd>2</kbd></dd></div><div><dt>Plus / Minus</dt><dd><kbd>Enter</kbd> <kbd>−</kbd></dd></div><div><dt>Home</dt><dd><kbd>H</kbd></dd></div><div><dt>Zeiger</dt><dd>Maus im Spielbild</dd></div></dl><p class="detail">Zum Steuern zuerst ins Spielbild klicken. Bewegungssensoren werden noch nicht unterstützt.</p></section>
       <section><h2>Browser & Kern</h2><ul id="capabilities"></ul><p id="core-info" class="detail">Kein Kern verbunden</p><button id="retry" class="quiet">Kern erneut prüfen</button></section>
     </aside>
   </div>
@@ -47,7 +47,7 @@ const buttons = new Set<Button>();
 let pointer = { x: 0.5, y: 0.5, visible: false };
 function appendLog(message: string) { log.textContent = [...(log.textContent || '').split('\n'), message].slice(-150).join('\n'); }
 function send(command: Command) { worker?.postMessage(command); }
-function input() { send({ type: 'input', input: { buttons: [...buttons], pointer } }); }
+function input() { if (!core?.capabilities?.wiiInput) return; send({ type: 'input', input: { buttons: [...buttons], pointer } }); }
 function resetInput() { buttons.clear(); pointer = { ...pointer, visible: false }; input(); }
 function refresh() {
   start.disabled = pending || !['ready', 'paused'].includes(state);
@@ -70,6 +70,7 @@ function receive(event: CoreEvent) {
     state = event.type === 'error' ? 'error' : event.state;
     if (event.type === 'status' && event.core) {
       core = event.core;
+      el('input-status').textContent = core.capabilities?.wiiInput ? 'Wii-Steuerung verbunden.' : 'Dieser Kern hat noch keine Wii-Steuerung. Tasten und Zeiger werden nicht weitergereicht.';
       el('core-info').textContent = `${core.name} (${core.revision})`;
       el('formats').textContent = `Unterstützt: ${core.formats.join(', ')}`;
       file.accept = core.formats.map(format => `.${format}`).join(',');
