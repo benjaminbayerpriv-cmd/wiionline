@@ -145,6 +145,7 @@ struct LocalCounters
   std::uint64_t fifo_age_sample_count_published = 0;
   std::uint64_t fifo_pending_observed_at_us = 0;
   std::uint64_t xfb_generation_count = 0;
+  std::uint64_t draw_batch_count = 0;
   std::uint64_t xfb_generation_last_us = 0;
   std::uint64_t xfb_generation_total_us = 0;
   std::uint64_t xfb_generation_max_us = 0;
@@ -181,6 +182,7 @@ struct Snapshot
   std::uint64_t fifo_age_sample_count = 0;
   std::uint64_t fifo_distance_underflow_count = 0;
   std::uint64_t xfb_generation_count = 0;
+  std::uint64_t draw_batch_count = 0;
   std::uint64_t xfb_generation_last_us = 0;
   std::uint64_t xfb_generation_total_us = 0;
   std::uint64_t xfb_generation_max_us = 0;
@@ -225,6 +227,7 @@ inline std::atomic<std::uint64_t> s_fifo_age_max_us{0};
 inline std::atomic<std::uint64_t> s_fifo_age_sample_count{0};
 inline std::atomic<std::uint64_t> s_fifo_distance_underflow_count{0};
 inline std::atomic<std::uint64_t> s_xfb_generation_count{0};
+inline std::atomic<std::uint64_t> s_draw_batch_count{0};
 inline std::atomic<std::uint64_t> s_xfb_generation_last_us{0};
 inline std::atomic<std::uint64_t> s_xfb_generation_total_us{0};
 inline std::atomic<std::uint64_t> s_xfb_generation_max_us{0};
@@ -291,7 +294,7 @@ inline void ResetPublished()
            &s_fifo_consume_count,
            &s_fifo_bytes_last, &s_fifo_bytes_max, &s_fifo_age_last_us, &s_fifo_age_max_us,
            &s_fifo_age_sample_count, &s_fifo_distance_underflow_count,
-           &s_xfb_generation_count, &s_xfb_generation_last_us, &s_xfb_generation_total_us,
+           &s_xfb_generation_count, &s_draw_batch_count, &s_xfb_generation_last_us, &s_xfb_generation_total_us,
            &s_xfb_generation_max_us, &s_frame_generation_count, &s_frame_interval_last_us,
            &s_frame_interval_total_us, &s_frame_interval_max_us, &s_frame_interval_count})
   {
@@ -747,6 +750,12 @@ inline void RecordXfbGeneration(std::uint64_t elapsed_us)
   AtomicMax(s_xfb_generation_max_us, elapsed_us);
 }
 
+inline void RecordDrawBatch()
+{
+  if (Enabled())
+    s_draw_batch_count.fetch_add(1, std::memory_order_relaxed);
+}
+
 inline void RecordFifoBurst(std::uint64_t previous_bytes, std::uint64_t burst_bytes)
 {
   if (!PrepareLocal())
@@ -886,6 +895,7 @@ inline Snapshot Capture()
   snapshot.fifo_distance_underflow_count =
       s_fifo_distance_underflow_count.load(std::memory_order_relaxed);
   snapshot.xfb_generation_count = s_xfb_generation_count.load(std::memory_order_relaxed);
+  snapshot.draw_batch_count = s_draw_batch_count.load(std::memory_order_relaxed);
   snapshot.xfb_generation_last_us = s_xfb_generation_last_us.load(std::memory_order_relaxed);
   snapshot.xfb_generation_total_us = s_xfb_generation_total_us.load(std::memory_order_relaxed);
   snapshot.xfb_generation_max_us = s_xfb_generation_max_us.load(std::memory_order_relaxed);

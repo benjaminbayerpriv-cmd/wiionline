@@ -511,6 +511,7 @@ std::string RasterProfileStats()
       << " fifouf:" << profile.fifo_distance_underflow_count
       << " xfbgen:" << profile.xfb_generation_count << "/" << profile.xfb_generation_last_us
       << "/" << profile.xfb_generation_total_us << "/" << profile.xfb_generation_max_us
+      << " drawbatch:" << profile.draw_batch_count
       << " framegen:" << profile.frame_generation_count << "/"
       << profile.frame_interval_last_us << "/" << profile.frame_interval_total_us << "/"
       << profile.frame_interval_max_us << "/" << profile.frame_interval_count;

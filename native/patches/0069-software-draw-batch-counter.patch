@@ -1,0 +1,20 @@
+diff --git a/Source/Core/VideoBackends/Software/SWVertexLoader.cpp b/Source/Core/VideoBackends/Software/SWVertexLoader.cpp
+--- a/Source/Core/VideoBackends/Software/SWVertexLoader.cpp
++++ b/Source/Core/VideoBackends/Software/SWVertexLoader.cpp
+@@ -24,4 +24,8 @@
+ #include "VideoCommon/Statistics.h"
+ #include "VideoCommon/VertexLoaderManager.h"
++
++#ifdef __EMSCRIPTEN__
++#include "dolphin_web_raster_profile.h"
++#endif
+ #include "VideoCommon/VertexShaderManager.h"
+ #include "VideoCommon/VideoConfig.h"
+@@ -65,4 +69,7 @@
+   m_setup_unit.Init(primitive_type);
+   Rasterizer::SetTevKonstColors();
++#ifdef __EMSCRIPTEN__
++  DolphinWeb::RasterProfile::RecordDrawBatch();
++#endif
+   // BP/TEV state is stable for the submitted GX batch. Classify the exact
+   // measured program once here rather than rebuilding its tuple per pixel.
