@@ -44,8 +44,21 @@ let core: CoreInfo | undefined;
 let pending = false;
 let starting = false;
 let hasFrame = false;
+const oglFrameProbe = new URLSearchParams(location.search).get('video') === 'ogl';
+let oglProbeStartedAt = 0;
+let oglProbeReportAt = 0;
+let oglProbeLastHash: number | undefined;
+let oglProbeHashChanges = 0;
+let oglProbeFrameCount = 0;
 function appendLog(message: string) { log.textContent = [...(log.textContent || '').split('\n'), message].slice(-150).join('\n'); }
 function send(command: Command) { worker?.postMessage(command); }
+async function loadSelectedFile(selected: File) {
+  if (!core) return;
+  const problem = validateFile(selected, core);
+  if (problem) { el('status').textContent = problem; return; }
+  el('filename').textContent = selected.name;
+  pending = true; refresh(); send({ type: 'load', file: selected });
+}
 const browserInput = bindBrowserInput(canvas, () => state === 'running' && !!core?.capabilities?.wiiInput, input => {
   if (core?.capabilities?.wiiInput) send({type:'input',input});
 });
@@ -69,12 +82,19 @@ function receive(event: CoreEvent) {
     pending = false;
     starting = false;
     state = event.type === 'error' ? 'error' : event.state;
+    if (event.type === 'status' && state === 'running' && oglFrameProbe) {
+      oglProbeStartedAt = oglProbeReportAt = performance.now();
+      oglProbeLastHash = undefined; oglProbeHashChanges = oglProbeFrameCount = 0;
+    }
     if (event.type === 'status' && event.core) {
       core = event.core;
       el('input-status').textContent = core.capabilities?.wiiInput ? 'Wii-Steuerung verbunden.' : 'Dieser Kern hat noch keine Wii-Steuerung. Tasten und Zeiger werden nicht weitergereicht.';
       el('core-info').textContent = `${core.name} (${core.revision})`;
       el('formats').textContent = `Unterstützt: ${core.formats.join(', ')}`;
-      file.accept = core.formats.map(format => `.${format}`).join(',');
+      // macOS' native chooser may hide RVZ images despite the extension being
+      // listed here. Keep the picker unfiltered; validate against core.formats
+      // after selection in the worker.
+      file.removeAttribute('accept');
     }
     el('status').textContent = event.message;
     el('status').classList.toggle('error', event.type === 'error');
@@ -90,6 +110,19 @@ function receive(event: CoreEvent) {
       if (state !== 'running' && !starting) return;
       const { width, height, rgba } = event;
       if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 4096 || height > 4096 || rgba.byteLength !== width * height * 4) { appendLog('Ungültiges Bildformat vom Kern.'); return; }
+      if (oglFrameProbe && oglProbeStartedAt) {
+        const pixels = new Uint32Array(rgba);
+        let hash = 2166136261;
+        for (let i = 0; i < pixels.length; i++) hash = Math.imul(hash ^ pixels[i], 16777619);
+        if (oglProbeLastHash !== undefined && hash !== oglProbeLastHash) oglProbeHashChanges++;
+        oglProbeLastHash = hash; oglProbeFrameCount++;
+        const now = performance.now();
+        if (now - oglProbeReportAt >= 5000) {
+          const seconds = (now - oglProbeReportAt) / 1000;
+          appendLog(`OGL-Probe: vollständige RGBA-Hashes wechselten ${oglProbeHashChanges}-mal in ${seconds.toFixed(1)} s; native Frames geliefert=${oglProbeFrameCount} (keine VI-FPS).`);
+          oglProbeReportAt = now; oglProbeHashChanges = oglProbeFrameCount = 0;
+        }
+      }
       if (canvas.width !== width) canvas.width = width;
       if (canvas.height !== height) canvas.height = height;
       context?.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
@@ -108,17 +141,14 @@ function initialize() {
     worker = new Worker(new URL('./emulator.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (event: MessageEvent<CoreEvent>) => receive(event.data);
     worker.onerror = event => { event.preventDefault(); receive({ type: 'error', code: 'WORKER_FAILURE', message: event.message || 'Der Emulator-Worker konnte nicht gestartet werden.' }); };
-    send({ type: 'init' });
+    const videoBackend = new URLSearchParams(location.search).get('video') === 'ogl' ? 'ogl' : 'software';
+    send({ type: 'init', videoBackend });
   } catch (error) { receive({ type: 'error', code: 'WORKER_FAILURE', message: String(error) }); }
 }
 retry.onclick = initialize;
 file.onchange = () => {
   const selected = file.files?.[0]; file.value = '';
-  if (!selected || !core) return;
-  const problem = validateFile(selected, core);
-  if (problem) { el('status').textContent = problem; return; }
-  el('filename').textContent = selected.name;
-  pending = true; refresh(); send({ type: 'load', file: selected });
+  if (selected) void loadSelectedFile(selected);
 };
 start.onclick = async () => {
   pending = true; refresh();

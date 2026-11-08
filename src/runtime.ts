@@ -45,7 +45,7 @@ export class Runtime {
         if (event.type === 'status') return;
         if (event.type === 'error') { this.state = 'error'; this.failureVersion++; }
         this.emit(event);
-      });
+      }, { videoBackend: command.videoBackend ?? 'software' });
       if (!core?.info?.name || !Array.isArray(core.info.formats) ||
           !['load', 'start', 'pause', 'stop', 'input'].every(key => typeof core[key as keyof EmulatorCore] === 'function')) {
         throw new Error('Der Adapter entspricht nicht dem vereinbarten Kern-Vertrag.');

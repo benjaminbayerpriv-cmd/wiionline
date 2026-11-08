@@ -1,4 +1,4 @@
-import type { CoreEvent, EmulatorCore, InputState } from './protocol';
+import type { CoreCreateOptions, CoreEvent, EmulatorCore, InputState } from './protocol';
 import { loadSystemFonts } from './system-fonts';
 import { mountRvz, supportsDiscFiles } from './disc-file';
 import { createAudioBridge } from './native-audio';
@@ -29,17 +29,20 @@ export class DolphinAdapter implements EmulatorCore {
   private frameTimer?: ReturnType<typeof setInterval>;
   private audioBridge?: ReturnType<typeof createAudioBridge>;
   private audioClock = 0;
-  constructor(private module: DolphinModule, private emit: (event: CoreEvent) => void) {
+  private oglProbeTimer?: ReturnType<typeof setInterval>;
+  constructor(private module: DolphinModule, private emit: (event: CoreEvent) => void,
+              private videoBackend: 'software' | 'ogl' = 'software') {
     for (const name of required) {
       if (typeof module[`_${name}`] !== 'function') throw new Error(`Im WASM-Kern fehlt der Export ${name}.`);
     }
     if (this.number('WiiOnline_AbiVersion') !== 1) throw new Error('Nicht unterstützte Wii-Online-Kern-ABI.');
-    this.requireOne('SetVideoBackend', ['string'], ['Software Renderer']);
+    this.requireOne('SetVideoBackend', ['string'], [videoBackend === 'ogl' ? 'OGL' : 'Software Renderer']);
     this.requireOne('SetCpuCore', ['string'], ['cached']);
     if (typeof module._SetPpcWasmJitEnabled === 'function') {
       module.ccall('SetPpcWasmJitEnabled', null, ['number'], [1]);
       this.info.name = 'Dolphin WASM / Cached + WASM-JIT';
     }
+    if (videoBackend === 'ogl') this.info.name = 'Dolphin WASM / OGL Readback (experiment)';
     this.requireOne('SetCpuThread', ['number'], [1]);
     this.requireOne('CoreInit');
     if (supportsDiscFiles(module)) this.info.formats.push('rvz');
@@ -53,7 +56,7 @@ export class DolphinAdapter implements EmulatorCore {
       this.frameBridge = createFrameBridge(module);
       this.info.capabilities.video = true;
     }
-    this.emit({ type: 'log', message: `Native Kern-ABI 1 initialisiert. Experimentelle Software-Bildausgabe; Wii-Input-Exporte ${this.info.capabilities.wiiInput ? 'verfügbar (Gastnachweis separat erforderlich)' : 'fehlen noch'}; PCM-Brücke ${this.info.capabilities.audio ? 'verfügbar (hörbarer Gastton noch separat zu prüfen)' : 'nicht verfügbar'}.` });
+    this.emit({ type: 'log', message: `Native Kern-ABI 1 initialisiert. Experimentelle ${videoBackend === 'ogl' ? 'OGL-Readback-Bildausgabe' : 'Software-Bildausgabe'}; Wii-Input-Exporte ${this.info.capabilities.wiiInput ? 'verfügbar (Gastnachweis separat erforderlich)' : 'fehlen noch'}; PCM-Brücke ${this.info.capabilities.audio ? 'verfügbar (hörbarer Gastton noch separat zu prüfen)' : 'nicht verfügbar'}.` });
   }
   private number(name: string, types: string[] = [], values: unknown[] = []) {
     return Number(this.module.ccall(name, 'number', types, values));
@@ -128,6 +131,7 @@ export class DolphinAdapter implements EmulatorCore {
   private startPump() {
     if (this.timer) return;
     this.audioClock = performance.now();
+    if (this.videoBackend === 'ogl') this.startOglProbe();
     this.timer = setInterval(() => {
       try {
         this.pump();
@@ -151,6 +155,42 @@ export class DolphinAdapter implements EmulatorCore {
   private clearPump() {
     if (this.timer) clearInterval(this.timer); this.timer = undefined;
     if (this.frameTimer) clearInterval(this.frameTimer); this.frameTimer = undefined;
+    if (this.oglProbeTimer) clearInterval(this.oglProbeTimer); this.oglProbeTimer = undefined;
+  }
+  private startOglProbe() {
+    const names = ['GetCoreTicksHigh', 'GetCoreTicksLow', 'GetCoreTicksPerSecond'];
+    if (!names.every(name => typeof this.module[`_${name}`] === 'function')) {
+      this.emit({ type: 'log', message: 'OGL-Probe: Gastzeit-Exporte fehlen; Spielzeit-Rate nicht messbar.' });
+      return;
+    }
+    const ticks = () => (BigInt(this.number('GetCoreTicksHigh') >>> 0) << 32n) | BigInt(this.number('GetCoreTicksLow') >>> 0);
+    let previousAt = performance.now();
+    let previousTicks = ticks();
+    let previousVi = this.number('GetFrame') >>> 0;
+    this.oglProbeTimer = setInterval(() => {
+      const now = performance.now();
+      const currentTicks = ticks();
+      const currentVi = this.number('GetFrame') >>> 0;
+      const guestSeconds = Number(currentTicks - previousTicks) / this.number('GetCoreTicksPerSecond');
+      const wallSeconds = (now - previousAt) / 1000;
+      const stats = typeof this.module._GetVideoStats === 'function' ? this.text('GetVideoStats') : 'GetVideoStats-Export fehlt';
+      this.emit({ type: 'log', message: `OGL-Probe: Gastzeit/Wandzeit=${(guestSeconds / wallSeconds).toFixed(3)}x; VI-Generationen delta=${(currentVi - previousVi) >>> 0} (kein FPS-Maß); Wiimote=${this.readWiimoteDebug()}; Native VideoStats: ${stats.slice(0, 600)}` });
+      previousAt = now;
+      previousTicks = currentTicks;
+      previousVi = currentVi;
+    }, 5000);
+  }
+  private readWiimoteDebug() {
+    if (typeof this.module._WiiOnline_GetWiimoteDebug !== 'function' ||
+        typeof this.module._malloc !== 'function' || typeof this.module._free !== 'function' ||
+        !(this.module.HEAPU32 instanceof Uint32Array)) return 'debug export unavailable';
+    const ptr = Number((this.module._malloc as (size: number) => number)(64));
+    if (!ptr) return 'debug allocation failed';
+    try {
+      const count = this.number('WiiOnline_GetWiimoteDebug', ['number', 'number'], [0, ptr]);
+      const words = (this.module.HEAPU32 as Uint32Array).slice(ptr >>> 2, (ptr >>> 2) + 16);
+      return `n=${count} active=${words[0]} gen=${words[1]} build=${words[2]} hex=0x${words[3].toString(16)} mask=0x${words[15].toString(16)}`;
+    } finally { (this.module._free as (ptr: number) => void)(ptr); }
   }
   async pause() {
     this.input(neutralInput());
@@ -166,11 +206,13 @@ export class DolphinAdapter implements EmulatorCore {
   }
   input(input: InputState) {
     if (!this.info.capabilities.wiiInput) return;
-    this.module.ccall('WiiOnline_SetWiimote', null, Array(8).fill('number'), wiimoteArguments(input));
+    const args = wiimoteArguments(input);
+    this.module.ccall('WiiOnline_SetWiimote', null, Array(8).fill('number'), args);
+    if (this.videoBackend === 'ogl') this.emit({ type: 'log', message: `OGL-Eingabe: UI-Maske=0x${args[1].toString(16)}; Wiimote=${this.readWiimoteDebug()}` });
   }
 }
 
-export async function createCore(emit: (event: CoreEvent) => void): Promise<EmulatorCore> {
+export async function createCore(emit: (event: CoreEvent) => void, options: CoreCreateOptions = {}): Promise<EmulatorCore> {
   if (!globalThis.crossOriginIsolated || typeof SharedArrayBuffer === 'undefined') {
     throw new Error('Der Kern benötigt geteilten Speicher. Der Webserver muss COOP/COEP korrekt setzen.');
   }
@@ -183,14 +225,21 @@ export async function createCore(emit: (event: CoreEvent) => void): Promise<Emul
     default: (options: Record<string, unknown>) => Promise<DolphinModule>;
   };
   if (typeof native.default !== 'function') throw new Error('Die native Emscripten-Modulfabrik fehlt.');
+  const videoBackend = options.videoBackend === 'ogl' ? 'ogl' : 'software';
+  let canvas: OffscreenCanvas | undefined;
+  if (videoBackend === 'ogl') {
+    if (typeof OffscreenCanvas === 'undefined') throw new Error('OGL-Test benötigt OffscreenCanvas in diesem Worker.');
+    canvas = new OffscreenCanvas(640, 528);
+  }
   const module = await native.default({
     locateFile: (name: string) => `/core/${name}`,
+    ...(canvas ? { canvas, dolphinOglReadbackPresent: true, dolphinOglWorkerWebGl: true } : {}),
     print: (message: string) => emit({ type: 'log', message }),
     printErr: (message: string) => emit({ type: 'log', message }),
     onAbort: (reason: unknown) => emit({ type: 'error', code: 'NATIVE_ABORT', message: `WASM-Abbruch: ${String(reason)}` }),
   });
   await loadSystemFonts(module);
-  return new DolphinAdapter(module, emit);
+  return new DolphinAdapter(module, emit, videoBackend);
 }
 
 export { loadSystemFonts } from './system-fonts';
