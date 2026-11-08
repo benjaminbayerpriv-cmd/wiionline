@@ -33,3 +33,13 @@ Der Nutzer sah „~5 fps mit ~2 s Verzögerung“. Das passt zu ~3,3 neuen Bilde
 - Kein Minispiel erreicht: Skript-Eingaben kamen bis zur Mii-Auswahl, Spielmenü/Minispiel nicht. Last in echten Spielphasen ungemessen.
 - Alle Browser-Zahlen: headless Chrome 157 bzw. ein sichtbarer Lauf; kein Firefox/Safari; ein Rechner (Apple Silicon, 10 Kerne).
 - Kein belegter Kern-Fix. Behauptung „Spiel läuft flüssig“ ist **nicht** zulässig.
+
+## Instrumentierung vom 08.11.2026 (Commit 3aff0e5)
+
+Der vorhandene Software-Kopierpfad `SWEfbInterface::EncodeXFB` meldet nach abgeschlossener RAM-Kopie bereits `xfbgen` im aktivierten Rasterprofil. Das ist ein Ereignis an der tatsächlichen EFB→XFB-Kopie, nicht am VI-Scanout. Neu zählt `SWVertexLoader::DrawCurrentBatch` die tatsächlich an den Software-Renderer übergebenen GX-Batches (`drawbatch`). Beide Zähler sind kumulativ und werden mit `SetSoftwareRasterProfileEnabled(1)` eingeschaltet. Ein Node-Boot mit dem neuen WASM-Build erreichte 27 XFB-Kopien und 244 Draw-Batches; dieser kurze Lauf diente nur der Funktionsprüfung unter paralleler Rechnerlast.
+
+Build: `scripts/core-build.sh patch && scripts/core-build.sh configure && JOBS=8 scripts/core-build.sh build` im Kern-Checkout, Dolphin e22551e; SHA-256 des erzeugten WASM: `42f67e40dc895f8f89099ef6ba469f325334a4c3e6dcf3a18fcc99162772c0a1`. Disc bleibt lokal und wird nicht eingecheckt. Rohdaten liegen unter `native/perf/data/`.
+
+Vorläufige Läufe mit dem vorherigen Build (Profil aktiv, ohne neuen Batch-Zähler): Im Sicherheitsbild wurden über 24,71 s Wandzeit 24,72 s Gastzeit, 1481 VI-/XFB-Ausgaben und 136 echte XFB-Kopien gemessen. Mit der geskripteten Folge A bei 12, 24 und 36 s waren es im Fenster 25–60 s über 34,78 s Wandzeit 34,62 s Gastzeit, 2076 VI-/XFB-Ausgaben und 120 Kopien. Die Vollbild-Hash-Abstände geänderter Ausgaben hatten dort einen Median von 304,6 ms. `rast` aus dem älteren Profil ist nicht monoton und wird nicht als Draw-Rate interpretiert. Die Rohdateien heißen `baseline-old-title.json` und `old-input-sequence.json`.
+
+Für den kontrollierten Throttle-Vergleich nutzt `probe-worker.mjs` Gastsekunden (`g`) für Eingabeereignisse und hält das Auswertefenster in Gastzeit konstant; `summarize.py` meldet Ereignisse pro Wand- und Gastsekunde getrennt. Eine niedrigere Zahl geänderter Ausgaben ist kein FPS-Nachweis für eine ganze Spielphase.
