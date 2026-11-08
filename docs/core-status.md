@@ -102,3 +102,5 @@ Vollständigen `all`-Lauf von leer prüfen; CI-Cache für den ~1-h-Build; echtes
 
 ## Fertiger Kern als Release (2026-11-08)
 Die Binaries stehen bewusst **nicht** im Git-Verlauf (Build-Artefakte, ~12,6 MB je Version, Repo-Regel), sondern als Release-Anhang: `core-e22551e-20261108-1` mit `dolphin-core-upstream.js`, `dolphin-core-upstream.wasm`, `SHA256SUMS`. Holen und prüfen: `scripts/core-fetch.sh [Zielordner]` (Standard `public/core`). Gebaut mit `scripts/core-build.sh all` aus diesem Stand (Dolphin e22551e, Patches 0001–0076). SHA-256: `js 1aceb139…e9de`, `wasm 554e47ac…bbe340` (vollständig in `SHA256SUMS`). Quelltext/Patches liegen im Repo (GPLv2+, `native/LICENSE.wasm-dolphin`). Der OGL-Pfad ist darin enthalten; Standard bleibt der Software-Renderer (siehe `docs/performance-status.md`).
+
+**Update (Eigentümer-Entscheidung):** Der fertige Kern liegt zusätzlich im Repo unter `core-dist/` (js, wasm, `SHA256SUMS`, README). Einbinden: `npm run core:install -- core-dist`. Hashes unverändert (js `1aceb139…`, wasm `554e47ac…`).
