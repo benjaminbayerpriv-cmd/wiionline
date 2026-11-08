@@ -551,8 +551,8 @@ std::string OglSwapStats()
   out << " swapt:" << DolphinWeb_OglSwapTiming(0) << "/" << DolphinWeb_OglSwapTiming(1) << "/"
       << DolphinWeb_OglSwapTiming(2) << "/" << DolphinWeb_OglSwapTiming(3) << "/" << DolphinWeb_OglSwapTiming(4) << "/" << DolphinWeb_OglSwapTiming(5);
   out << " gl:";
-  for (int i = 0; i < 20; ++i)
-    out << static_cast<long long>(DolphinWeb_OglGlStat(i)) << (i < 19 ? "/" : "");
+  for (int i = 0; i < 36; ++i)
+    out << static_cast<long long>(DolphinWeb_OglGlStat(i)) << (i < 35 ? "/" : "");
   out << " xfbc:" << DolphinWeb_XfbCopyCount();
   out << " irq:";
   for (int b = 0; b < 15; ++b)

@@ -127,3 +127,18 @@ Chrome 157 headless mit **echter GPU** (`ANGLE (Apple, ANGLE Metal Renderer: App
 - **Ergebnis:** Ein belegter Kern-Fix für die geringe Bildrate in OGL liegt **nicht** vor. Belegt ist: (1) OGL „hängt“ nicht, sondern gibt ~1,4 Frames/s ab; (2) das Warten der Seite auf A erklärt sich damit; (3) 85–90 % der GPU-Thread-Zeit stehen im ersten Lesen nach dem Zeichnen; (4) doppelte Presents sind ein vermeidbarer Zusatz.
 - **Nächste Messung:** Chrome-Trace des GPU-Prozesses während eines OGL-Laufs (Zeit pro `readPixels`/ANGLE-Metal-Befehlsbuffer) oder Gegenprobe ohne Ubershader (`GFX_SHADER_COMPILATION_MODE`), jeweils auf echter GPU und ohne dass dabei ein Video in demselben Chrome läuft.
 - Artefakt für diese Messungen: `dolphin-core-upstream.wasm` SHA-256 siehe `dist-core/SHA256SUMS` nach `scripts/core-build.sh build`; ein sauberer Komplettbau aus leerem Verzeichnis wurde **nicht** wiederholt, die neuen Patches sind nur gegen den vorhandenen Arbeitsbaum geprüft. Ohne Diagnose-Flags verhält sich der Kern wie zuvor (Readback bleibt synchron, Standard-Flags unverändert), außer dass Swap jetzt bei unverändertem Bild alle 30 Swaps statt jedes Mal liest (Patch 0073) und Diagnosezähler laufen.
+
+### Auflösung (2026-11-08, Abend): die Bremse ist ANGLE/Metal in Chrome 157
+
+Gleicher Kern (SHA-256 siehe `dist-core/SHA256SUMS`), gleiche Konfiguration (OGL, `dolphinOglReadbackPresent`+`dolphinOglWorkerWebGl`, Standard-Presents), Chrome 157 headless, Wii Play, nur das ANGLE-Backend per Kommandozeile gewechselt (`CHROME_ARGS` in `native/perf/run-browser.mjs`):
+
+| ANGLE-Backend | erstes Lesen je Readback | Readbacks in 20 s | `PE_FINISH` nach 20 s (≈ Spiel-Frames) |
+|---|---:|---:|---:|
+| Metal (Standard, Apple M1 Pro) | ~0,9–1,0 s | 16 | 52 (≈ 2,6/s) |
+| SwiftShader (`--use-angle=swiftshader --enable-unsafe-swiftshader`) | ~10 ms | 286 | 924 (≈ 46/s) |
+
+Mit SwiftShader-ANGLE läuft OGL funktional: 393 verschiedene Bilder in 45 s (~14/s im Mittel, 11–16/s in der Spielphase), A bei 15 s löst das Disc-Lesen bis 20 s aus (`22 702 196` Bytes), Spielzeit ~1,0. Das Ergebnis hängt also **nicht** am Kern oder am Spiel, sondern am Browser-Grafikpfad: Der GPU-Prozess (Chrome-Trace, `native/perf/trace-run.mjs`) ist unter Metal zu ~90 % mit der Ausführung der Worker-WebGL-Befehle beschäftigt (95 Flushes, im Mittel ~80 ms, Spitzen 0,5–0,7 s), obwohl die Aufrufmenge winzig ist (~12 Draws/s, ~40 `bufferSubData`/s, ~1,4 MB gesamt). `sample` auf den GPU-Prozess zeigt CPU-Arbeit in Chrome-Code (nicht Warten) mit viel `memmove`. Früher als „SwiftShader/headless“ gelabelte OGL-Messungen waren in Wirklichkeit Metal (die Variante `glRenderer` im Ergebnis zeigt es jetzt an).
+
+- **Belegt:** (1) OGL im Kern funktioniert; (2) die ~1-s-Wartezeit je Readback entsteht im Browser-GPU-Prozess unter ANGLE/Metal für diese Last; (3) dieselbe Last ist mit ANGLE/SwiftShader ~18-mal schneller.
+- **Nicht belegt:** welche GL-Eigenschaft Metal ausbremst (Vermutungen: Vertex-Attribut-Konvertierung, Zustandsvarianten/PSO-Bau, Puffer-Umbenennung); ob andere Chrome-Versionen/Rechner betroffen sind; ob `chrome://flags` → „Choose ANGLE graphics backend“ die SwiftShader-Option anbietet (nur die Kommandozeile getestet). SwiftShader ist Software-GL und belastet die CPU (neben den Emulator-Threads); eine Dauerlösung ist das nicht.
+- **Nächste Schritte:** (a) mit einer kleinen eigenständigen WebGL2-Seite oder durch gezieltes Abschalten einzelner Dolphin-GL-Zustände (z. B. Vertex-Formate, Blend/ColorMask-Wechsel) das Metal-Auslöser-Merkmal eingrenzen und dann im Kern vermeiden; (b) andere Chrome-/Safari-/Firefox-Versionen messen; (c) bis dahin für Tests SwiftShader-ANGLE nutzen.

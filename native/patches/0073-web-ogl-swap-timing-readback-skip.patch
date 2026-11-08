@@ -79,12 +79,10 @@
      return 0;
  
    const std::uint32_t published_rgba = static_cast<std::uint32_t>(s_readback_data[0]) |
-@@ -298,10 +351,72 @@
- 
-   m_backbuffer_width = 640;
+@@ -300,8 +353,81 @@
    m_backbuffer_height = 480;
-+}
-+
+ }
+ 
 +extern "C" unsigned DolphinWeb_XfbCopyCount();
 +
 +// wiionline (Patch 0073): Zeitmessung des Readbacks je Swap (Diagnose).
@@ -104,12 +102,12 @@
 +}
 +
 +// Diagnose: WebGL-Aufrufzaehler/-zeiten (Kontext des GPU-Threads), je Swap in dieses Feld exportiert.
-+static double s_web_gl_stats[24];
++static double s_web_gl_stats[48];
 +extern "C" double DolphinWeb_OglGlStat(int i)
 +{
-+  return (i >= 0 && i < 24) ? s_web_gl_stats[i] : 0.0;
- }
- 
++  return (i >= 0 && i < 48) ? s_web_gl_stats[i] : 0.0;
++}
++
  void GLContextEmscripten::Swap()
  {
 +  const double swap_t0 = emscripten_get_now();
@@ -117,6 +115,7 @@
 +  if (!s_gl_stats_installed)
 +  {
 +    s_gl_stats_installed = true;
++    EM_ASM({ Module.__glSyncMode = $0; }, DolphinWeb_OglFlag(2));
 +    emscripten_run_script(R"JS(
 +      (function() {
 +        const ctx = (typeof Module !== 'undefined' && Module._dolphinWorkerGLCtx) ||
@@ -124,7 +123,9 @@
 +        if (!ctx) return;
 +        const st = {};
 +        const names = ['linkProgram', 'compileShader', 'texImage2D', 'texSubImage2D', 'drawElements', 'drawArrays',
-+                       'bufferData', 'bufferSubData'];
++                       'bufferData', 'bufferSubData', 'blitFramebuffer', 'copyTexSubImage2D', 'clear', 'clearBufferfv',
++                       'drawElementsInstanced', 'drawArraysInstanced', 'invalidateFramebuffer', 'useProgram'];
++        const syncMode = (Module.__glSyncMode | 0) === 9;
 +        for (const n of names) {
 +          const orig = ctx[n];
 +          if (typeof orig !== 'function') continue;
@@ -132,7 +133,15 @@
 +          ctx[n] = function() {
 +            const t = performance.now();
 +            const r = orig.apply(this, arguments);
-+            st[n][0]++; st[n][1] += performance.now() - t;
++            if (syncMode) ctx.finish();
++            st[n][0]++;
++            // Puffer-Uploads: zweiter Wert = hochgeladene Bytes statt Zeit.
++            if (n === 'bufferSubData' || n === 'texSubImage2D' || n === 'bufferData') {
++              const a = arguments; const view = a[2] && a[2].byteLength !== undefined ? a[2] : (a[1] && a[1].byteLength !== undefined ? a[1] : null);
++              st[n][1] += (view ? (a.length >= 5 && typeof a[4] === 'number' ? a[4] : view.byteLength) : (typeof a[1] === 'number' && n === 'bufferData' ? a[1] : 0));
++            } else {
++              st[n][1] += performance.now() - t;
++            }
 +            return r;
 +          };
 +        }
@@ -143,7 +152,7 @@
 +            HEAPF64[(ptr >> 3) + i++] = v[0]; HEAPF64[(ptr >> 3) + i++] = v[1];
 +          }
 +          const d = Module.__rbDiag || [0, 0, 0, 0];
-+          for (let k = 0; k < 4; ++k) HEAPF64[(ptr >> 3) + 16 + k] = d[k];
++          for (let k = 0; k < 4; ++k) HEAPF64[(ptr >> 3) + 32 + k] = d[k];
 +        };
 +      })();
 +    )JS");
@@ -152,7 +161,7 @@
    static std::uint32_t s_diagnostic_clear_frame = 0;
    std::uint32_t readback_rgba = 0;
    if (DolphinWebUseDiagnosticClear())
-@@ -326,7 +441,37 @@
+@@ -326,7 +452,37 @@
  
    const bool worker_owned_webgl = DolphinWeb_UseWorkerOwnedWebGL() != 0;
    if (worker_owned_webgl && DolphinWebUseOglReadbackPresent())
@@ -191,7 +200,7 @@
  
    const std::uint32_t debug_bits = DolphinWebOglDebugBits();
    const int gl_error = static_cast<int>(glGetError());
-@@ -428,6 +573,9 @@
+@@ -428,6 +584,9 @@
      // happening before transferToImageBitmap captured the next frame.
      // For now, accept the over-speed; pace via something else later.
    }

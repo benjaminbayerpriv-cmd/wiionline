@@ -4,7 +4,7 @@ import { spawn } from "node:child_process"; import fs from "node:fs"; import os 
 const cfg = JSON.parse(process.argv[2]); const port = 9300 + Math.floor(Math.random() * 500);
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const prof = fs.mkdtempSync(path.join(os.tmpdir(), "perf-chrome-"));
-const p = spawn(chrome, ["--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${prof}`, "--no-first-run", "--no-default-browser-check", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--autoplay-policy=no-user-gesture-required", "about:blank"], { stdio: "ignore" });
+const p = spawn(chrome, ["--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${prof}`, "--no-first-run", "--no-default-browser-check", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--autoplay-policy=no-user-gesture-required", ...(process.env.CHROME_ARGS ? process.env.CHROME_ARGS.split(" ") : []), "about:blank"], { stdio: "ignore" });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let ws, id = 0; const pend = new Map();
 try {
