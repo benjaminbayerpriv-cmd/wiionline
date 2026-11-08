@@ -9,6 +9,7 @@ export class Runtime {
   private failureVersion = 0;
   constructor(private factory: () => Promise<CreateCore>, private emit: (event: CoreEvent) => void) {}
   dispatch(command: Command): Promise<void> {
+    if (command.type === 'frame-ack') return Promise.resolve();
     if (command.type === 'input') {
       if (this.state === 'running') {
         try { this.core?.input(command.input); }
@@ -33,7 +34,7 @@ export class Runtime {
     await action();
     return version === this.failureVersion;
   }
-  private async execute(command: Exclude<Command, { type: 'input' }>) {
+  private async execute(command: Exclude<Command, { type: 'input' | 'frame-ack' }>) {
     if (command.type === 'init') {
       if (this.core) throw new Error('Der Kern ist bereits initialisiert. Zum Neustart die Seite neu laden.');
       this.status('loading', 'Emulator-Kern wird geladen …');

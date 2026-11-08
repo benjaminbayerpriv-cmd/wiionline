@@ -84,15 +84,18 @@ function receive(event: CoreEvent) {
     refresh();
   } else if (event.type === 'log') appendLog(event.message);
   else if (event.type === 'frame') {
-    // A native start can produce its first frame before its promise resolves.
-    if (state !== 'running' && !starting) return;
-    const { width, height, rgba } = event;
-    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 4096 || height > 4096 || rgba.byteLength !== width * height * 4) { appendLog('Ungültiges Bildformat vom Kern.'); return; }
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
-    context?.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
-    hasFrame = true;
-    el('empty').hidden = true;
+    // Ack even for a stale frame so the worker can deliver its newest replacement.
+    try {
+      // A native start can produce its first frame before its promise resolves.
+      if (state !== 'running' && !starting) return;
+      const { width, height, rgba } = event;
+      if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 4096 || height > 4096 || rgba.byteLength !== width * height * 4) { appendLog('Ungültiges Bildformat vom Kern.'); return; }
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
+      context?.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
+      hasFrame = true;
+      el('empty').hidden = true;
+    } finally { send({ type: 'frame-ack' }); }
   } else if (event.type === 'audio' && (state === 'running' || starting)) audio.play(event.pcm, event.sampleRate);
   else if (event.type === 'metrics') { /* Performance claims require a validated native measurement path. */ }
 }

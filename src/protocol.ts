@@ -6,6 +6,7 @@ export type Command =
   | { type: 'init' }
   | { type: 'load'; file: File }
   | { type: 'start' | 'pause' | 'stop' }
+  | { type: 'frame-ack' }
   | { type: 'input'; input: InputState };
 export type CoreInfo = { name: string; revision: string; formats: string[]; capabilities?: { wiiInput: boolean; video: boolean; audio: boolean } };
 export type CoreEvent =

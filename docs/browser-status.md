@@ -30,6 +30,7 @@ User supplied Wii Play (Europe, Rev 1).rvz, 167047716 bytes, correct RVZ magic. 
 
 ## Performance-claim correction
 
+
 User observed that the reported FPS and 100% speed do not match visible game behavior. Codex had labeled native VI/XFB publication cadence as game FPS and a timer-derived ratio as game speed. Those signals were not validated against actual guest-rendered frames or observed game time, so the quantitative UI display and the speed claim have been withdrawn. Cached+JIT is enabled, but real gameplay speed remains unverified and visible slowdown remains open. Repeated scanout of the same XFB must not count as new game-rendered frames.
 
 ## Browser guest input proof
@@ -48,3 +49,7 @@ Geprüft (alles mit dem aktuellen Kern, SHA-256 JS bd1555ab…ac3d, WASM ef97f9f
 - Wii Play (Europe, Rev 1, RVZ lokal geladen, nicht committet) im gleichen Chrome: Warnbild (Handschlaufe) erscheint nach etwa einer Minute, nach gleichzeitigem Drücken von linker und rechter Maustaste folgt das Titelbild mit dem vom Mauszeiger gesteuerten Hand-Cursor. Dazu liegen Screenshots nur lokal vor. Unklar bleibt, ob das Warnbild allein durch A oder auch durch Zeit weiterschaltet; die Aussage ist deshalb „Eingabe erreicht das Spiel, Zeiger wird dargestellt“, nicht „vollständig bedienbar“.
 
 Offen/Grenzen: keine Geschwindigkeits- oder FPS-Aussage (Boot bis Warnbild etwa 45 bis 60 s, Spiel läuft deutlich unter Echtzeit); nur Slot 0; Firefox/Safari/Windows ungeprüft; Ton nicht hörbar geprüft; im eingebetteten Browser-Pane der Claude-App starten die Pthread-Worker nicht, daher wird headless Chrome per CDP genutzt. `vite preview` liefert nach einem Neubau veraltete Dateien aus dem Speicher; den Vorschauserver nach `npm run build` neu starten.
+
+## Begrenzte Bildübergabe
+
+Der Worker überträgt höchstens ein Bild, während der Hauptthread es verarbeitet, und hält höchstens das jeweils neueste weitere Bild (`src/frame-mailbox.ts`). Der Hauptthread bestätigt nach `putImageData`; daraufhin wird das neueste wartende Bild gesendet. Beim Pausieren oder Stoppen wird ein wartendes Bild verworfen. So entsteht zwischen Worker und UI keine unbeschränkt lange Bildwarteschlange. `tests/frame-mailbox.test.ts` prüft 200 schnelle Bilder gegen eine langsame UI; der Browser-E2E-Test mit echtem Kern besteht weiterhin 13/13. Die sichtbare Wii-Play-Latenz wurde nach dieser Änderung noch nicht neu gemessen. Der Kernbericht `docs/performance-status.md` nennt etwa 3,3 neue Bildinhalte pro Sekunde am Titelbildschirm als separate Beobachtung.
