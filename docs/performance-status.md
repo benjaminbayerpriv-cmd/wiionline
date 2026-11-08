@@ -1,6 +1,6 @@
 # Performance-Status Wii Play (Kern-Zweig)
 
-Stand: 2026-11-08. Alle Zahlen sind gemessen; Reproduktion: `native/perf/` (`probe.mjs` Node, `serve-perf.mjs` + `run-browser.mjs` + `probe-worker.mjs` headless Chrome 157 per CDP, `summarize.py`, `shots.py`). Kern: Dolphin e22551e, Artefakte aus `docs/core-status.md` (js bd1555ab…, wasm ef97f9fb…). Disc: lokale Wii-Play-RVZ (nicht im Repo).
+Stand: 2026-11-08. Alle Zahlen sind gemessen; Reproduktion: `native/perf/` (`probe.mjs` Node, `serve-perf.mjs` + `run-browser.mjs` + `probe-worker.mjs` headless Chrome 157 per CDP, `summarize.py`, `shots.py`). Kern: Dolphin e22551e; die ersten Messungen nutzten die Artefakte aus `docs/core-status.md`, die neue Instrumentierung den unten genannten Build. Disc: lokale Wii-Play-RVZ (nicht im Repo).
 
 ## Begriffe (bewusst getrennt)
 - **Spielzeit-Rate**: Gast-Ticks (CoreTiming, Taktrate je Sample neu gelesen, Wii = 729 MHz) pro Wandzeit. Erste Messung las 486 MHz (zu früh, vor Wii-Init) und zeigte fälschlich 1,5.
@@ -30,17 +30,17 @@ Der Nutzer sah „~5 fps mit ~2 s Verzögerung“. Das passt zu ~3,3 neuen Bilde
 
 ## Nachtrag 2026-11-08: Ursache eingegrenzt (Messbelege `docs/evidence/perf-matrix.json`)
 Profil des Kerns (`SetSoftwareRasterProfileEnabled(1)`, `GetVideoStats`: `xfbgen` = EFB→XFB-Kopien, `rast`, `tev`, `tex`):
-1. **Echte Spielbilder** = EFB→XFB-Kopien (`xfbgen`), nicht Scanouts. Titelbildschirm, Zweikern (Standard der Seite): **~3,0 pro Wandsekunde** bei 59,9 VI/s. Die Kopie selbst kostet ~15 ms und ist nicht der Engpass.
-2. **Einkern-Gegenprobe** (`SetCpuThread(0)`, Throttle an): Spielzeit-Rate nur 0,06, aber **59,94 EFB→XFB-Kopien pro Spielsekunde** (3,7 pro Wandsekunde). Das Spiel rendert in Gastzeit also mit 60 Bildern/s; es wird **nicht** durch einen Gast-Takt (Wiimote/BT) gebremst. Ein Spielbild kostet ~270 ms Wandzeit.
+1. **Tatsächliche EFB→XFB-Kopien** (`xfbgen`), keine Scanouts: Titelbildschirm, Zweikern (Standard der Seite): **~3,0 Kopien pro Wandsekunde** bei 59,9 VI-Ausgaben/s. Kopien können gleichen Bildinhalt enthalten; Änderungen werden separat per Vollbild-Hash geprüft. Die Kopie selbst kostet ~15 ms und ist nicht der Engpass.
+2. **Einkern-Gegenprobe** (`SetCpuThread(0)`, Throttle an): Spielzeit-Rate nur 0,06, aber **59,94 EFB→XFB-Kopien pro Spielsekunde** (3,7 pro Wandsekunde). Das Spiel stößt in Gastzeit also Kopien mit ~60/s an; es wird **nicht** durch einen Gast-Takt (Wiimote/BT) auf ~3 Kopien pro Spielsekunde begrenzt. Eine Kopie liegt etwa 270 ms Wandzeit nach der vorigen.
 3. **Software-Rasterizer dominiert**: ~34 000 Rasteraufrufe in 85 s, im Mittel ~1,6 ms (gesampelt 1:64) → ~56 s von ~60 aktiven Sekunden; ~349 Mio TEV- und ~356 Mio Textur-Pixelaufrufe, ~1,15 Mio Pixel/Spielbild (viel Überzeichnung). Das passt zu ~3,3 gerenderten Bildern/s. (Die Zeitschätzung beruht auf Stichproben und ist ungefähr.)
-4. **Zweikernmodus**: Der Gast läuft mit 60/s weiter, der GPU-Thread rendert nur ~3/s; die Anzeige zeigt entsprechend selten neue Bilder, und die Eingabe wirkt erst mit dem GPU-Rückstand. Das erklärt „~5 fps mit ~2 s Verzögerung“ qualitativ; die Verzögerung selbst ist nicht direkt gemessen.
+4. **Zweikernmodus**: Die Gastzeit läuft weiter, während der Software-GPU-Thread nur ~3 XFB-Kopien/s abschließt; die Anzeige zeigt entsprechend selten neue Inhalte, und die Eingabe wirkt erst mit dem GPU-Rückstand. Das erklärt „~5 fps mit ~2 s Verzögerung“ qualitativ; die Verzögerung selbst ist nicht direkt gemessen.
 5. **Die geerbten Schnellmodi helfen nicht**: `SetFastSoftwareRaster` 1/2/3 → 2,96/2,99/3,07 Kopien/s; `SetSoftwareTevHotCaseMode` 1/2/3 → 3,17/3,09/3,08; Standard ~2,9–3,0. Unterschiede liegen im Rauschen.
 6. Throttle/Timing-Hacks (`SleepUntil` schläft, Emulationsgeschwindigkeit 1,0, Overclock 1,0) sind unauffällig: 59,9 VI/s, Spielzeit 1,00.
 
-**Folgerung:** Der Software-Rasterizer (SW-Backend in WASM, ein Thread) schafft bei Wii Play ~3 Bilder/s. Das ist ein Durchsatzproblem der Pixel-Pipeline (TEV + Textur), kein Pacing- und kein Seitenproblem. Wege (nicht umgesetzt, nicht getestet): (a) Hardware-Renderer (WebGL2/WebGPU) statt Software; im Patchsatz gibt es einen OGL/WebGL2-Pfad, dessen Zustand ungeprüft ist (Grafik-Zweig); (b) Rasterisierung auf mehrere Pthreads aufteilen; (c) Pixel-Pipeline optimieren (SIMD). Einen belegten, sicheren Kern-Fix gibt es nicht; kein Standardwert wurde geändert.
+**Folgerung:** Der Software-Rasterizer (SW-Backend in WASM, ein Thread) schafft bei Wii Play in dieser Phase ~3 EFB→XFB-Kopien/s. Das ist ein Durchsatzproblem der Pixel-Pipeline (TEV + Textur), kein Pacing- und kein Seitenproblem. Wege (nicht umgesetzt, nicht getestet): (a) Hardware-Renderer (WebGL2/WebGPU) statt Software; im Patchsatz gibt es einen OGL/WebGL2-Pfad, dessen Zustand ungeprüft ist (Grafik-Zweig); (b) Rasterisierung auf mehrere Pthreads aufteilen; (c) Pixel-Pipeline optimieren (SIMD). Einen belegten, sicheren Kern-Fix gibt es nicht; kein Standardwert wurde geändert.
 
 ## Offen / ungeklärt
-- (Erledigt, siehe Nachtrag oben:) Ursache der ~3,3 neuen Bilder/s. Frühere Kandidatenliste: Kandidaten: (a) Software-Renderer/GPU-Thread liefert EFB→XFB-Kopien nur selten, (b) Spiel wartet auf Wiimote-/BT-HLE-Takt, (c) Animation am Titel ist tatsächlich so langsam (nicht ausgeschlossen, Bildfolge nicht visuell verglichen). Geplante, nicht ausgeführte Tests: Übertaktung 3× (Lauf lief in Timeouts, kein Ergebnis), Messung pro Gast-Sekunde ohne Throttle (der 4-ms-Hash-Timer blockierte dort den Worker), Zähler im Software-Renderer für EFB→XFB-Kopien und gezeichnete Quads (Patch noch nicht geschrieben).
+- Ursache der seltenen Kopien für diesen Software-Renderer-Pfad eingegrenzt (siehe Nachtrag und kontrolliertes Gastzeitfenster). Übertaktung 3× lieferte zuvor kein verwertbares Ergebnis; die Gastzeit-Gegenprobe ohne Throttle ist inzwischen ausgeführt. Das Verhalten anderer Renderer und echter Minispiele bleibt offen.
 - Kein Minispiel erreicht: Skript-Eingaben kamen bis zur Mii-Auswahl, Spielmenü/Minispiel nicht. Last in echten Spielphasen ungemessen.
 - Alle Browser-Zahlen: headless Chrome 157 bzw. ein sichtbarer Lauf; kein Firefox/Safari; ein Rechner (Apple Silicon, 10 Kerne).
 - Kein belegter Kern-Fix. Behauptung „Spiel läuft flüssig“ ist **nicht** zulässig.
@@ -54,3 +54,19 @@ Build: `scripts/core-build.sh patch && scripts/core-build.sh configure && JOBS=8
 Vorläufige Läufe mit dem vorherigen Build (Profil aktiv, ohne neuen Batch-Zähler): Im Sicherheitsbild wurden über 24,71 s Wandzeit 24,72 s Gastzeit, 1481 VI-/XFB-Ausgaben und 136 echte XFB-Kopien gemessen. Mit der geskripteten Folge A bei 12, 24 und 36 s waren es im Fenster 25–60 s über 34,78 s Wandzeit 34,62 s Gastzeit, 2076 VI-/XFB-Ausgaben und 120 Kopien. Die Vollbild-Hash-Abstände geänderter Ausgaben hatten dort einen Median von 304,6 ms. `rast` aus dem älteren Profil ist nicht monoton und wird nicht als Draw-Rate interpretiert. Die Rohdateien heißen `baseline-old-title.json` und `old-input-sequence.json`.
 
 Für den kontrollierten Throttle-Vergleich nutzt `probe-worker.mjs` Gastsekunden (`g`) für Eingabeereignisse und hält das Auswertefenster in Gastzeit konstant; `summarize.py` meldet Ereignisse pro Wand- und Gastsekunde getrennt. Eine niedrigere Zahl geänderter Ausgaben ist kein FPS-Nachweis für eine ganze Spielphase.
+
+### Kontrolliertes Fenster 25–55 Gastsekunden
+
+Chrome 157 headless, Software-Renderer, Zweikern, A-Eingaben bei Gastsekunde 12–13, 24–25 und 36–37, Rasterprofil aktiv, keine Bild-Hashes während der Vergleichsläufe. Rohdateien unter `native/perf/data/core-*.json`. Alle Zahlen sind **Ereignisse**, nicht FPS.
+
+| Einstellung | Gastzeit/Wandzeit | VI-Ausgaben/Gast-s | EFB→XFB-Kopien/Gast-s | SW-Draw-Batches/Gast-s | JIT-Blöcke/Gast-s |
+|---|---:|---:|---:|---:|---:|
+| Throttle 1, WASM-JIT an | 0,997 | 59,95 | 3,37 | 189,84 | 4,00 Mio. |
+| Throttle 0, WASM-JIT an | 5,921 | 59,96 | 1,15 | 10,33 | 3,24 Mio. |
+| Throttle 1, WASM-JIT aus | 0,997 | 59,94 | 4,00 | 241,40 | 0 |
+
+Eingabeereignisse wurden tatsächlich bei 12,01/13,02/24,06/25,01/36,05/37,02 Gastsekunden (Throttle an) und 12,01/13,09/24,07/25,28/36,11/37,05 (Throttle aus) ausgelöst; die leichte Abweichung folgt dem 50-ms-Polling. Ohne Throttle läuft der Gast schneller, aber die Zahl fertiggestellter Kopien und Draw-Batches pro Gastsekunde sinkt stark. Die CPU ist also nicht durch den VI-Takt blockiert; der Software-GPU-Pfad fällt gegenüber der Gastzeit zurück. Der Vergleich beweist keine exakte Eingabelatenz und keine Bildrate eines Minispiels. Dass ohne WASM-JIT weiterhin ~4 Kopien pro Gastsekunde entstehen, schließt laufende WASM-JIT-Blöcke als notwendige Ursache aus.
+
+Ein zusätzlicher 30-Gastsekunden-Lauf mit `SetPpcProfileEnabled(1)` zählte am VI/SI-Throttle-Punkt 122 Aufrufe, davon 68 langsame, mit insgesamt 2,98 s Wartezeit und 47,5 ms Maximum. Diese Profilzahlen gelten für den ganzen Lauf und werden wegen des zusätzlichen Profil-Overheads nicht direkt mit der obigen Fenster-Tabelle verrechnet. `rast` aus dem älteren Profil ist innerhalb dieser Läufe nicht monoton; daraus wird keine Draw-Rate berechnet. Der neue `drawbatch`-Zähler blieb monoton.
+
+Reproduktion nach dem Build: `node native/perf/serve-perf.mjs 8124 dist-core /absoluter/pfad/zur/lokalen/Wii-Play.rvz` starten; anschließend `node native/perf/run-browser.mjs '<JSON-Konfiguration>' > messung.json` und `python3 native/perf/summarize.py < messung.json`. Die exakten JSON-Konfigurationen einschließlich Gastzeitfenster und Eingaben stehen in `cfg` jeder Rohdatei. Die Disc wird weder kopiert noch committet.
