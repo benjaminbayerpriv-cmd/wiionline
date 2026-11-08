@@ -633,6 +633,7 @@ void EnsureRuntime()
     Config::SetBase(Config::GFX_HACK_SKIP_EFB_COPY_TO_RAM, false);
   DolphinWeb_SetOglFlag(0, EM_ASM_INT({ return (typeof Module !== 'undefined' && Module['dolphinOglReadbackEverySwap']) ? 1 : 0; }));
   DolphinWeb_SetOglFlag(2, EM_ASM_INT({ return (typeof Module !== 'undefined' && Module['dolphinOglRbMode']) ? Module['dolphinOglRbMode'] : 0; }));
+  DolphinWeb_SetOglFlag(3, EM_ASM_INT({ return (typeof Module !== 'undefined' && Module['dolphinOglFeatureMask']) ? Module['dolphinOglFeatureMask'] : 0; }));
   DolphinWeb_SetOglFlag(1, EM_ASM_INT({ return (typeof Module !== 'undefined' && Module['dolphinOglSkipDuplicateXFB']) ? 1 : 0; }));
   Config::SetBase(Config::GFX_HACK_COPY_EFB_SCALED, false);
   // §28cx: ubershaders DISCRIMINATOR (May-30). The UBO const-index fix made the

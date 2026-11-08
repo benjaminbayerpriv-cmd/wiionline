@@ -1,0 +1,25 @@
+--- a/Source/Core/VideoBackends/OGL/OGLConfig.cpp
++++ b/Source/Core/VideoBackends/OGL/OGLConfig.cpp
+@@ -21,6 +21,10 @@
+ #include "VideoCommon/FramebufferManager.h"
+ #include "VideoCommon/OnScreenDisplay.h"
+ #include "VideoCommon/VideoConfig.h"
++
++#ifdef __EMSCRIPTEN__
++extern "C" int DolphinWeb_OglFlag(int which);
++#endif
+ 
+ namespace OGL
+ {
+@@ -286,6 +290,11 @@
+   g_backend_info.bSupportsPrimitiveRestart =
+       !DriverDetails::HasBug(DriverDetails::BUG_PRIMITIVE_RESTART) &&
+       ((GLExtensions::Version() >= 310) || GLExtensions::Supports("GL_NV_primitive_restart"));
++#ifdef __EMSCRIPTEN__
++  // wiionline (Patch 0076): Diagnoseschalter Module.dolphinOglFeatureMask (Bit 0: ohne Primitive-Restart).
++  if (DolphinWeb_OglFlag(3) & 1)
++    g_backend_info.bSupportsPrimitiveRestart = false;
++#endif
+   g_backend_info.bSupportsGSInstancing = GLExtensions::Supports("GL_ARB_gpu_shader5");
+   g_backend_info.bSupportsSSAA = GLExtensions::Supports("GL_ARB_gpu_shader5") &&
+                                  GLExtensions::Supports("GL_ARB_sample_shading");
