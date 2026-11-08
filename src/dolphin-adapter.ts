@@ -181,14 +181,17 @@ export class DolphinAdapter implements EmulatorCore {
     }, 5000);
   }
   private readWiimoteDebug() {
+    const heap = this.module.HEAPU8;
     if (typeof this.module._WiiOnline_GetWiimoteDebug !== 'function' ||
         typeof this.module._malloc !== 'function' || typeof this.module._free !== 'function' ||
-        !(this.module.HEAPU32 instanceof Uint32Array)) return 'debug export unavailable';
+        !(heap instanceof Uint8Array)) return 'debug export unavailable';
     const ptr = Number((this.module._malloc as (size: number) => number)(64));
-    if (!ptr) return 'debug allocation failed';
+    if (!ptr || !Number.isInteger(ptr) || ptr % 4 !== 0 || ptr + 64 > heap.byteLength) return 'debug allocation failed';
     try {
       const count = this.number('WiiOnline_GetWiimoteDebug', ['number', 'number'], [0, ptr]);
-      const words = (this.module.HEAPU32 as Uint32Array).slice(ptr >>> 2, (ptr >>> 2) + 16);
+      // Emscripten only guarantees HEAPU8 in this module. Read the native
+      // 16-word snapshot directly from its buffer instead of requiring HEAPU32.
+      const words = new Uint32Array(heap.buffer, heap.byteOffset + ptr, 16);
       return `n=${count} active=${words[0]} gen=${words[1]} build=${words[2]} hex=0x${words[3].toString(16)} mask=0x${words[15].toString(16)}`;
     } finally { (this.module._free as (ptr: number) => void)(ptr); }
   }

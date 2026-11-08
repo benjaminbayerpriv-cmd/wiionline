@@ -17,11 +17,12 @@ Status: partial probe, not a Wii Play gameplay performance result.
 - After startup, sampled guest-time/wall-time ratios stayed about 0.99–1.01x. The first sample was 0.538x while the core was starting.
 - The full-RGBA hash changed during initial screen transitions, then remained identical across many five-second probe intervals. Frame deliveries continued at roughly 150–250 per five seconds, but repeated frames are not distinct game frames.
 - Thus the probe does not meet the success criterion of at least 20 distinct gameplay images/s. The game never left the safety screen, so no claim about Wii Play's gameplay performance follows from these measurements.
-- Keyboard X and a canvas left-click produced adapter logs with UI mask `0x1` followed by `0x0`, confirming the browser-to-adapter input call. Neither advanced the safety screen. `_WiiOnline_GetWiimoteDebug` was unavailable in this loaded artifact, so the native HLE snapshot could not be observed from the page.
+- Keyboard X and a canvas left-click produced adapter logs with UI mask `0x1` followed by `0x0`. A defect in the adapter debug reader had falsely reported the native debug export unavailable: it required `HEAPU32`, while this artifact exposes `HEAPU8`. The adapter now reads the native 16-word snapshot through `HEAPU8`; the visible run then showed `mask=0x1`, `last_hex=0x800` after release, and an increasing build count. This proves A reached Dolphin's WPAD state builder.
+- The later OGL log hashes changed after repeated A presses, but the Mac locked during the run and the screenshots became black. The exact guest screen and whether those changes represent advancing Wii Play screens could not be verified visually.
 - Paused/stopped the emulator after the run. The temporary local file server was stopped. No native core build or second performance run was started.
 
 ## Follow-up
 
-The kernel owner is checking whether the loaded artifact exports the agreed debug getter and whether `SetWiimote` reaches Dolphin's WPAD/HLE guest path. Re-run the visible-Chrome image-hash probe only after a guest input demonstrably advances to Wii Play's title/gameplay screen. Keep distinct-content hashes separate from VI callbacks and guest clock rate.
+The kernel owner's independent software-renderer run verified that A reaches the guest and advanced past warning screens. Re-run the OGL visible-Chrome image-hash probe after unlocking macOS and verify the actual title/gameplay screen visually. Keep distinct-content hashes separate from VI callbacks and guest clock rate.
 
 The software-renderer matrix and its limitations are documented on `claude/core-wasm` in `docs/performance-status.md`, commit `55e7a23`. Its title-screen runs found no useful speedup from the fast raster/TEV modes; they did not measure a minigame.

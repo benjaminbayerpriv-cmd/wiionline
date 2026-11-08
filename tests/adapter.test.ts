@@ -91,3 +91,28 @@ test('Wiimote adapter neutralizes on pause and clears its override on stop', asy
   assert.ok(f.calls.includes('WiiOnline_ClearWiimote'));
   assert.ok(!f.calls.includes('SetInputState'));
 });
+
+test('Wiimote debug reads the 16-word snapshot through HEAPU8', () => {
+  const f = fixture();
+  const heap = new Uint8Array(new SharedArrayBuffer(4096));
+  Object.assign(f.module, {
+    HEAPU8: heap,
+    _WiiOnline_SetWiimote: () => {},
+    _WiiOnline_ClearWiimote: () => {},
+    _WiiOnline_GetWiimoteDebug: () => {},
+    _malloc: () => 256,
+    _free: () => {},
+  });
+  const base = f.module.ccall;
+  f.module.ccall = (name, result, types, values) => {
+    if (name === 'WiiOnline_GetWiimoteDebug') {
+      const words = new Uint32Array(heap.buffer, Number(values?.[1]), 16);
+      words.set([1, 7, 9, 0x0800, ...Array(11).fill(0), 0x0800]);
+      return 16;
+    }
+    return base(name, result, types, values);
+  };
+  const adapter = new DolphinAdapter(f.module, event => f.events.push(event), 'ogl');
+  adapter.input({ buttons: ['A'], pointer: { x: .5, y: .5, visible: false } });
+  assert.ok(f.events.some(event => event.type === 'log' && event.message.includes('n=16 active=1 gen=7 build=9 hex=0x800 mask=0x800')));
+});
