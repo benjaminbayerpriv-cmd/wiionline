@@ -1,0 +1,132 @@
+--- a/Source/Core/VideoBackends/OGL/OGLConfig.cpp
++++ b/Source/Core/VideoBackends/OGL/OGLConfig.cpp
+@@ -23,7 +23,17 @@
+ #include "VideoCommon/VideoConfig.h"
+ 
+ #ifdef __EMSCRIPTEN__
++#include <emscripten/em_asm.h>
+ extern "C" int DolphinWeb_OglFlag(int which);
++extern "C" void DolphinWeb_GlClipControl()
++{
++  EM_ASM({
++    const c = (typeof Module !== 'undefined' && Module._dolphinWorkerGLCtx) ||
++              (typeof GL !== 'undefined' && GL.currentContext ? GL.currentContext.GLctx : null);
++    if (c && c.clipControlEXT) c.clipControlEXT(0x8CA1, 0x935F);
++    if (c && $0 && c.getExtension('EXT_depth_clamp')) c.enable(0x864F);  // DEPTH_CLAMP_EXT
++  }, (DolphinWeb_OglFlag(3) & 16) ? 1 : 0);
++}
+ #endif
+ 
+ namespace OGL
+@@ -287,6 +297,15 @@
+ 
+   g_backend_info.bSupportsDualSourceBlend = (GLExtensions::Supports("GL_ARB_blend_func_extended") ||
+                                              GLExtensions::Supports("GL_EXT_blend_func_extended"));
++#ifdef __EMSCRIPTEN__
++  // wiionline (Patch 0079): WebGL-Erweiterung WEBGL_blend_func_extended (Dual-Source-Blending, Chrome).
++  if (DolphinWeb_OglFlag(3) & 8)
++    g_backend_info.bSupportsDualSourceBlend = EM_ASM_INT({
++      const c = (typeof Module !== 'undefined' && Module._dolphinWorkerGLCtx) ||
++                (typeof GL !== 'undefined' && GL.currentContext ? GL.currentContext.GLctx : null);
++      return (c && c.getExtension('WEBGL_blend_func_extended')) ? 1 : 0;
++    }) != 0;
++#endif
+   g_backend_info.bSupportsPrimitiveRestart =
+       !DriverDetails::HasBug(DriverDetails::BUG_PRIMITIVE_RESTART) &&
+       ((GLExtensions::Version() >= 310) || GLExtensions::Supports("GL_NV_primitive_restart"));
+@@ -306,6 +325,15 @@
+       GLExtensions::Supports("GL_OES_texture_buffer") ||
+       GLExtensions::Supports("GL_EXT_texture_buffer");
+   g_backend_info.bSupportsClipControl = GLExtensions::Supports("GL_ARB_clip_control");
++#ifdef __EMSCRIPTEN__
++  // wiionline (Patch 0078, optional: dolphinOglFeatureMask Bit 2): WebGL-Erweiterung EXT_clip_control.
++  if (DolphinWeb_OglFlag(3) & 4)
++    g_backend_info.bSupportsClipControl = EM_ASM_INT({
++      const c = (typeof Module !== 'undefined' && Module._dolphinWorkerGLCtx) ||
++                (typeof GL !== 'undefined' && GL.currentContext ? GL.currentContext.GLctx : null);
++      return (c && c.getExtension('EXT_clip_control')) ? 1 : 0;
++    }) != 0;
++#endif
+   g_ogl_config.bSupportsCopySubImage =
+       (GLExtensions::Supports("GL_ARB_copy_image") || GLExtensions::Supports("GL_NV_copy_image") ||
+        GLExtensions::Supports("GL_EXT_copy_image") ||
+--- a/Source/Core/VideoBackends/OGL/OGLGfx.cpp
++++ b/Source/Core/VideoBackends/OGL/OGLGfx.cpp
+@@ -22,6 +22,10 @@
+ 
+ #include <algorithm>
+ #include <string_view>
++
++#ifdef __EMSCRIPTEN__
++extern "C" void DolphinWeb_GlClipControl();
++#endif
+ 
+ namespace OGL
+ {
+@@ -176,7 +180,11 @@
+     m_main_gl_context->SwapInterval(g_ActiveConfig.bVSyncActive);
+ 
+   if (g_backend_info.bSupportsClipControl)
++#ifdef __EMSCRIPTEN__
++    DolphinWeb_GlClipControl();
++#else
+     glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
++#endif
+ 
+   if (g_backend_info.bSupportsDepthClamp)
+   {
+--- a/Source/Core/VideoBackends/OGL/ProgramShaderCache.cpp
++++ b/Source/Core/VideoBackends/OGL/ProgramShaderCache.cpp
+@@ -37,6 +37,10 @@
+ #include "VideoCommon/VideoBackendBase.h"
+ #include "VideoCommon/VideoConfig.h"
+ 
++#ifdef __EMSCRIPTEN__
++extern "C" void DolphinWeb_GlClipControl();
++#endif
++
+ namespace OGL
+ {
+ u32 ProgramShaderCache::s_ubo_buffer_size;
+@@ -137,8 +141,10 @@
+       // So we do support extended blending
+       // So we need to set a few more things here.
+       // Bind our out locations
++#ifndef __EMSCRIPTEN__
+       glBindFragDataLocationIndexed(glprogid, 0, 0, "ocol0");
+       glBindFragDataLocationIndexed(glprogid, 0, 1, "ocol1");
++#endif
+     }
+     // Need to set some attribute locations
+     glBindAttribLocation(glprogid, static_cast<GLuint>(ShaderAttrib::Position), "rawpos");
+@@ -776,10 +782,18 @@
+   }
+   else
+   {
++#ifdef __EMSCRIPTEN__
++    // WebGL (ESSL 3.00): Ausgaben per layout (Dual-Source mit index) statt glBindFragDataLocationIndexed.
++    binding_layout = "#define ATTRIBUTE_LOCATION(x)\n"
++                     "#define FRAGMENT_OUTPUT_LOCATION(x) layout(location = x)\n"
++                     "#define FRAGMENT_OUTPUT_LOCATION_INDEXED(x, y) layout(location = x, index = y)\n"
++                     "#define UBO_BINDING(packing, x) layout(packing)\n"
++#else
+     binding_layout = "#define ATTRIBUTE_LOCATION(x)\n"
+                      "#define FRAGMENT_OUTPUT_LOCATION(x)\n"
+                      "#define FRAGMENT_OUTPUT_LOCATION_INDEXED(x, y)\n"
+                      "#define UBO_BINDING(packing, x) layout(packing)\n"
++#endif
+                      "#define SAMPLER_BINDING(x)\n"
+                      "#define TEXEL_BUFFER_BINDING(x)\n"
+                      "#define SSBO_BINDING(x) layout(std430)\n"
+@@ -933,7 +947,11 @@
+   if (!context->IsGLES())
+     glEnable(GL_PROGRAM_POINT_SIZE);
+   if (g_backend_info.bSupportsClipControl)
++#ifdef __EMSCRIPTEN__
++    DolphinWeb_GlClipControl();
++#else
+     glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
++#endif
+   if (g_backend_info.bSupportsDepthClamp)
+   {
+     glEnable(GL_CLIP_DISTANCE0);

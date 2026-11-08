@@ -6,6 +6,11 @@ http.createServer(async (req, res) => {
   const name = decodeURIComponent(new URL(req.url, "http://x").pathname).replace(/^\/+/, "") || "perf.html";
   const hdr = { "cross-origin-opener-policy": "same-origin", "cross-origin-embedder-policy": "require-corp", "cache-control": "no-store", "access-control-allow-origin": "*", "cross-origin-resource-policy": "cross-origin" };
   try {
+    if (name === "state.bin") {
+      const f = "/tmp/perf/state.bin";
+      if (req.method === "PUT") { const chunks = []; for await (const c of req) chunks.push(c); await (await import("node:fs/promises")).writeFile(f, Buffer.concat(chunks)); res.writeHead(200, hdr); return res.end("ok"); }
+      res.writeHead(200, { ...hdr, "content-type": "application/octet-stream", "content-length": (await stat(f)).size }); return res.end(await readFile(f));
+    }
     if (name === "disc.rvz" && disc) { res.writeHead(200, { ...hdr, "content-type": "application/octet-stream", "content-length": (await stat(disc)).size }); return res.end(await readFile(disc)); }
     for (const r of [here, dist]) { const f = path.join(r, name); if (!f.startsWith(r)) continue; try { if ((await stat(f)).isFile()) { res.writeHead(200, { ...hdr, "content-type": types[path.extname(f)] || "application/octet-stream" }); return res.end(await readFile(f)); } } catch {} }
   } catch {}

@@ -534,6 +534,7 @@ extern "C" unsigned DolphinWeb_PiIrqCount(int bit);
 extern "C" unsigned DolphinWeb_XfbCopyCount();
 extern "C" unsigned long long DolphinWeb_OglSwapTiming(int which);
 extern "C" double DolphinWeb_OglGlStat(int i);
+extern "C" const char* DolphinWeb_BackendFeatures();
 extern "C" const char* DolphinWeb_OglGlNames();
 
 std::string OglSwapStats()
@@ -555,6 +556,7 @@ std::string OglSwapStats()
   for (int i = 0; i < 36; ++i)
     out << static_cast<long long>(DolphinWeb_OglGlStat(i)) << (i < 35 ? "/" : "");
   out << " glnames:" << DolphinWeb_OglGlNames();
+  out << " feat:" << DolphinWeb_BackendFeatures();
   out << " xfbc:" << DolphinWeb_XfbCopyCount();
   out << " irq:";
   for (int b = 0; b < 15; ++b)

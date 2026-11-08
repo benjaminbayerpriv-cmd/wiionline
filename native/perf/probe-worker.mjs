@@ -37,12 +37,17 @@ onmessage = async (ev) => {
     const samples = []; const shots = []; const dist = { calls: 0, distinct: 0, series: [], gaps: [] };
     let lastGen = -1, lastHash = 0, lastDistinctT = 0;
     const gtimer = o.distinct ? setInterval(() => { const g = num("GetFrame"); if (g === lastGen) return; lastGen = g; dist.calls++; const w = num("FrameWidth"), h = num("FrameHeight"), p = num("FrameBuffer"); if (!w || !h || !p) return; const u = new Uint32Array(M.HEAPU8.buffer, p, w * h); let x = 2166136261; for (let i = 0; i < u.length; i++) x = Math.imul(x ^ u[i], 16777619); const t = (performance.now() - t0) / 1000; if (x !== lastHash) { lastHash = x; dist.distinct++; if (lastDistinctT) dist.gaps.push((t - lastDistinctT) * 1000); lastDistinctT = t; } const sec = Math.floor(t); dist.series[sec] = dist.series[sec] || [0, 0]; dist.series[sec][0]++; if (x !== dist.lastX) dist.series[sec][1]++; dist.lastX = x; }, 4) : null; const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    let stateLoaded = !o.loadAt, stateSaved = !o.saveAt;
+    const doSave = async () => { c("SaveStateFile", "number", ["string"], ["/state.sav"]); await sleep(4000); c("PumpHostJobs", null, [], []); const b = M.FS.readFile("/state.sav"); await fetch("/state.bin", { method: "PUT", body: b }); postMessage({ type: "log", m: "state saved " + b.length }); };
+    const doLoad = async () => { const b = new Uint8Array(await (await fetch("/state.bin")).arrayBuffer()); M.FS.writeFile("/state.sav", b); c("LoadStateFile", "number", ["string"], ["/state.sav"]); postMessage({ type: "log", m: "state loaded " + b.length }); };
     const script = (o.script || []).map((e) => ({ ...e, done: false })); const inputs = []; const shotAt = (o.shots || []).map((t) => ({ t, done: false }));
     const grab = (label) => { const w = num("FrameWidth"), h = num("FrameHeight"), p = num("FrameBuffer"); if (!w || !h || !p) return; const u8 = M.HEAPU8.slice(p, p + w * h * 4); let bin = ""; for (let i = 0; i < u8.length; i += 8192) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 8192)); shots.push({ label, w, h, b64: btoa(bin) }); };
     while ((performance.now() - t0) / 1000 < o.seconds && (o.guestEnd == null || guestSeconds() < o.guestEnd)) {
       const now = (performance.now() - t0) / 1000;
       const guest = guestSeconds();
       for (const e of script) if (!e.done && (e.g == null ? now >= e.t : guest >= e.g)) { e.done = true; c("WiiOnline_SetWiimote", null, Array(8).fill("number"), [0, e.b || 0, e.x ?? 0.5, e.y ?? 0.5, e.v ?? 1, 0, 0, 1]); inputs.push({ requestedGuest: e.g, requestedWall: e.t, actualGuest: guest, actualWall: now, buttons: e.b || 0 }); }
+      if (!stateLoaded && now >= o.loadAt) { stateLoaded = true; await doLoad(); }
+      if (!stateSaved && now >= o.saveAt) { stateSaved = true; await doSave(); }
       for (const e of memAt) if (!e.done && now >= e.t) { e.done = true; memSnap(String(e.t)); }
       for (const e of shotAt) if (!e.done && now >= e.t) { e.done = true; grab(String(e.t)); }
       c("PumpHostJobs", null, [], []);

@@ -1,9 +1,12 @@
 --- a/Source/Core/VideoCommon/VideoConfig.cpp
 +++ b/Source/Core/VideoCommon/VideoConfig.cpp
-@@ -3,6 +3,10 @@
+@@ -3,6 +3,13 @@
  
  #include "VideoCommon/VideoConfig.h"
  
++#include <fmt/format.h>
++#include <string>
++
 +#ifdef __EMSCRIPTEN__
 +extern "C" int DolphinWeb_OglFlag(int which);
 +#endif
@@ -11,7 +14,7 @@
  #include <algorithm>
  #include <optional>
  
-@@ -187,7 +191,10 @@
+@@ -187,7 +194,10 @@
    // VI vsync to present, but only when OGL is the active backend - the
    // software backend keeps its skip semantics so it doesn't waste CPU on
    // redundant Present() work.
@@ -23,3 +26,28 @@
      bSkipPresentingDuplicateXFBs = false;
    // ImmediateXFB was tried here but it disables the ViSwap path that drives
    // OGL swaps at 60Hz. Without ViSwap, presents only fire on EFB->XFB copies,
+@@ -417,4 +427,24 @@
+   GetVideoEvents().config_changed_event.Trigger(changed_bits);
+ 
+   // TODO: Move everything else to the ConfigChanged event
++}
++
++#ifdef __EMSCRIPTEN__
++// wiionline (Patch 0075): Faehigkeiten des aktiven Backends als Text (Diagnose).
++extern "C" const char* DolphinWeb_BackendFeatures()
++{
++  static std::string s;
++  const BackendInfo& b = g_backend_info;
++  s = fmt::format(
++      "dual{},logic{},gs{},bbox{},fbfetch{},palette{},gpudec{},depthclamp{},clipctl{},revdepth{},bigpts{},vslpe{},"
++      "restart{},dynsamp{},earlyz{},bitfield{},ssaa{},lodbias{},partdepth{},unrdepth{},texbuf{},computes{}",
++      int(b.bSupportsDualSourceBlend), int(b.bSupportsLogicOp), int(b.bSupportsGeometryShaders), int(b.bSupportsBBox),
++      int(b.bSupportsFramebufferFetch), int(b.bSupportsPaletteConversion), int(b.bSupportsGPUTextureDecoding),
++      int(b.bSupportsDepthClamp), int(b.bSupportsClipControl), int(b.bSupportsReversedDepthRange),
++      int(b.bSupportsLargePoints), int(b.bSupportsVSLinePointExpand), int(b.bSupportsPrimitiveRestart),
++      int(b.bSupportsDynamicSamplerIndexing), int(b.bSupportsEarlyZ), int(b.bSupportsBitfield), int(b.bSupportsSSAA),
++      int(b.bSupportsLodBiasInSampler), int(b.bSupportsPartialDepthCopies), int(b.bSupportsUnrestrictedDepthRange),
++      int(b.bSupportsST3CTextures), int(b.bSupportsComputeShaders));
++  return s.c_str();
+ }
++#endif

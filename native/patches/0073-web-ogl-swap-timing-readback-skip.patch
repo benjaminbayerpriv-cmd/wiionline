@@ -40,7 +40,7 @@
      return 0;
  
    const std::uint32_t published_rgba = static_cast<std::uint32_t>(s_readback_data[0]) |
-@@ -298,10 +312,108 @@
+@@ -298,10 +312,126 @@
  
    m_backbuffer_width = 640;
    m_backbuffer_height = 480;
@@ -62,20 +62,20 @@
 +  case 5: return s_web_swap_px_us.load(std::memory_order_relaxed);
 +  default: return s_web_swap_rb_max_us.load(std::memory_order_relaxed);
 +  }
-+}
-+
+ }
+ 
 +// Diagnose: WebGL-Aufrufzaehler/-zeiten (Kontext des GPU-Threads), je Swap in dieses Feld exportiert.
 +static double s_web_gl_stats[48];
 +static char s_web_gl_names[8192];
 +extern "C" const char* DolphinWeb_OglGlNames()
 +{
 +  return s_web_gl_names;
- }
++}
 +extern "C" double DolphinWeb_OglGlStat(int i)
 +{
 +  return (i >= 0 && i < 48) ? s_web_gl_stats[i] : 0.0;
 +}
- 
++
  void GLContextEmscripten::Swap()
  {
 +  const double swap_t0 = emscripten_get_now();
@@ -124,6 +124,22 @@
 +          const orig2 = fn;
 +          ctx[k] = function() { all[k]++; return orig2.apply(this, arguments); };
 +        }
++        Module.__glLogs = [];
++        for (const k of ['getShaderInfoLog', 'getProgramInfoLog']) {
++          const o3 = ctx[k];
++          ctx[k] = function() { const r = o3.apply(this, arguments); if (r && r.length && Module.__glLogs.length < 12) Module.__glLogs.push(k + ': ' + r.slice(0, 400)); return r; };
++        }
++        {
++          const o4 = ctx.getProgramParameter;
++          ctx.getProgramParameter = function(p, pn) { const r = o4.apply(this, arguments); if (pn === ctx.LINK_STATUS && r === false && Module.__glLogs.length < 12) Module.__glLogs.push('LINK FAILED'); return r; };
++          const o5 = ctx.getShaderParameter;
++          ctx.getShaderParameter = function(sh, pn) { const r = o5.apply(this, arguments); if (pn === ctx.COMPILE_STATUS && r === false && Module.__glLogs.length < 12) Module.__glLogs.push('COMPILE FAILED'); return r; };
++        }
++        Module.__glModes = {};
++        for (const k of ['drawElements', 'drawArrays', 'drawElementsInstanced', 'drawArraysInstanced']) {
++          const o6 = ctx[k];
++          ctx[k] = function(mode) { const key = k + ':' + mode; Module.__glModes[key] = (Module.__glModes[key] || 0) + 1; return o6.apply(this, arguments); };
++        }
 +        Module.__glExport = function(ptr) {
 +          let i = 0;
 +          for (const n of names) {
@@ -144,12 +160,14 @@
 +      if (!Module.__glAll) return;
 +      const o = {};
 +      for (const k in Module.__glAll) if (Module.__glAll[k]) o[k] = Module.__glAll[k];
++      o._logs = Module.__glLogs || [];
++      o._modes = Module.__glModes || {};
 +      stringToUTF8(JSON.stringify(o), $0, 8192);
 +    }, s_web_gl_names);
    static std::uint32_t s_diagnostic_clear_frame = 0;
    std::uint32_t readback_rgba = 0;
    if (DolphinWebUseDiagnosticClear())
-@@ -326,7 +438,37 @@
+@@ -326,7 +456,37 @@
  
    const bool worker_owned_webgl = DolphinWeb_UseWorkerOwnedWebGL() != 0;
    if (worker_owned_webgl && DolphinWebUseOglReadbackPresent())
@@ -188,7 +206,7 @@
  
    const std::uint32_t debug_bits = DolphinWebOglDebugBits();
    const int gl_error = static_cast<int>(glGetError());
-@@ -428,6 +570,9 @@
+@@ -428,6 +588,9 @@
      // happening before transferToImageBitmap captured the next frame.
      // For now, accept the over-speed; pace via something else later.
    }
