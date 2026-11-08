@@ -174,11 +174,12 @@ export class DolphinAdapter implements EmulatorCore {
       const guestSeconds = Number(currentTicks - previousTicks) / this.number('GetCoreTicksPerSecond');
       const wallSeconds = (now - previousAt) / 1000;
       const stats = typeof this.module._GetVideoStats === 'function' ? this.text('GetVideoStats') : 'GetVideoStats-Export fehlt';
-      this.emit({ type: 'log', message: `OGL-Probe: Gastzeit/Wandzeit=${(guestSeconds / wallSeconds).toFixed(3)}x; VI-Generationen delta=${(currentVi - previousVi) >>> 0} (kein FPS-Maß); Wiimote=${this.readWiimoteDebug()}; Native VideoStats: ${stats.slice(0, 600)}` });
+      const pc = typeof this.module._GetPPCPC === 'function' ? `0x${(this.number('GetPPCPC') >>> 0).toString(16)}` : 'Export fehlt';
+      this.emit({ type: 'log', message: `OGL-Probe: PPC-PC=${pc}; Gastzeit/Wandzeit=${(guestSeconds / wallSeconds).toFixed(3)}x; VI-Generationen delta=${(currentVi - previousVi) >>> 0} (kein FPS-Maß); Wiimote=${this.readWiimoteDebug()}; Native VideoStats: ${stats.slice(0, 600)}` });
       previousAt = now;
       previousTicks = currentTicks;
       previousVi = currentVi;
-    }, 5000);
+    }, 1000);
   }
   private readWiimoteDebug() {
     const heap = this.module.HEAPU8;
