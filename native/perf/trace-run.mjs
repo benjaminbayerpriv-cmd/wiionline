@@ -4,7 +4,7 @@ import { spawn } from "node:child_process"; import fs from "node:fs"; import os 
 const cfg = JSON.parse(process.argv[2]); const cats = process.argv[3] || "gpu,gpu.angle,toplevel,viz,disabled-by-default-gpu.service,disabled-by-default-gpu.angle";
 const port = 9300 + Math.floor(Math.random() * 500); const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const prof = fs.mkdtempSync(path.join(os.tmpdir(), "perf-chrome-"));
-const p = spawn(chrome, ["--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${prof}`, "--no-first-run", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--autoplay-policy=no-user-gesture-required", "about:blank"], { stdio: "ignore" });
+const p = spawn(chrome, ["--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${prof}`, "--no-first-run", "--enable-gpu-service-tracing", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--autoplay-policy=no-user-gesture-required", "about:blank"], { stdio: "ignore" });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); let ws, id = 0; const pend = new Map(); const events = [];
 try {
   let targets; for (let i = 0; i < 50; i++) { try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); if (targets.find((t) => t.type === "page")) break; } catch {} await sleep(200); }

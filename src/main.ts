@@ -141,7 +141,10 @@ function initialize() {
     worker = new Worker(new URL('./emulator.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (event: MessageEvent<CoreEvent>) => receive(event.data);
     worker.onerror = event => { event.preventDefault(); receive({ type: 'error', code: 'WORKER_FAILURE', message: event.message || 'Der Emulator-Worker konnte nicht gestartet werden.' }); };
-    const videoBackend = new URLSearchParams(location.search).get('video') === 'ogl' ? 'ogl' : 'software';
+    // OGL (GPU über WebGL2) ist seit Patch 0077 deutlich schneller als der Software-Renderer; ?video=software erzwingt Software.
+    const videoParam = new URLSearchParams(location.search).get('video');
+    const hasWebGl2 = (() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } })();
+    const videoBackend = videoParam === 'software' ? 'software' : (videoParam === 'ogl' || hasWebGl2) ? 'ogl' : 'software';
     send({ type: 'init', videoBackend });
   } catch (error) { receive({ type: 'error', code: 'WORKER_FAILURE', message: String(error) }); }
 }

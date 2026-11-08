@@ -1,0 +1,59 @@
+--- a/Source/Core/VideoBackends/OGL/OGLStreamBuffer.cpp
++++ b/Source/Core/VideoBackends/OGL/OGLStreamBuffer.cpp
+@@ -2,6 +2,8 @@
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ 
+ #include "VideoBackends/OGL/OGLStreamBuffer.h"
++
++#include <algorithm>
+ 
+ #include "Common/Align.h"
+ #include "Common/MathUtil.h"
+@@ -312,9 +314,39 @@
+ class BufferSubData : public StreamBuffer
+ {
+ public:
++#ifdef __EMSCRIPTEN__
++  // wiionline (Patch 0077): Jede Aktualisierung schreibt bei Offset 0. Ein riesiger GL-Puffer (48/8/64 MB)
++  // zwingt ANGLE/Metal, bei jedem Draw den ganzen Puffer umzukopieren (~50 ms je Draw). Deshalb nur so gross
++  // wie noetig anlegen und bei Bedarf vergroessern.
+   BufferSubData(u32 type, u32 size) : StreamBuffer(type, size)
+   {
+     glBindBuffer(m_buffertype, m_buffer);
++    m_gl_capacity = std::min<u32>(size, 256 * 1024);
++    glBufferData(m_buffertype, m_gl_capacity, nullptr, GL_STREAM_DRAW);
++    m_pointer = new u8[m_size];
++  }
++
++  ~BufferSubData() override { delete[] m_pointer; }
++  std::pair<u8*, u32> Map(u32 size) override
++  {
++    if (size > m_gl_capacity)
++    {
++      u32 capacity = m_gl_capacity;
++      while (capacity < size)
++        capacity *= 2;
++      m_gl_capacity = std::min(capacity, std::max(m_size, size));
++      glBindBuffer(m_buffertype, m_buffer);
++      glBufferData(m_buffertype, m_gl_capacity, nullptr, GL_STREAM_DRAW);
++    }
++    return std::make_pair(m_pointer, 0);
++  }
++  void Unmap(u32 used_size) override { glBufferSubData(m_buffertype, 0, used_size, m_pointer); }
++  u8* m_pointer;
++  u32 m_gl_capacity = 0;
++#else
++  BufferSubData(u32 type, u32 size) : StreamBuffer(type, size)
++  {
++    glBindBuffer(m_buffertype, m_buffer);
+     glBufferData(m_buffertype, size, nullptr, GL_STATIC_DRAW);
+     m_pointer = new u8[m_size];
+   }
+@@ -323,6 +355,7 @@
+   std::pair<u8*, u32> Map(u32 size) override { return std::make_pair(m_pointer, 0); }
+   void Unmap(u32 used_size) override { glBufferSubData(m_buffertype, 0, used_size, m_pointer); }
+   u8* m_pointer;
++#endif
+ };
+ 
+ /* Fifo based on the glBufferData call.
