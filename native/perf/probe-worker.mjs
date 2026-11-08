@@ -25,6 +25,8 @@ onmessage = async (ev) => {
     const ticks = () => Number((BigInt(num("GetCoreTicksHigh")) << 32n) | BigInt(num("GetCoreTicksLow")));
     const bootTicks = ticks();
     const guestSeconds = () => (ticks() - bootTicks) / num("GetCoreTicksPerSecond");
+    const dbgPtr = typeof M._WiiOnline_GetWiimoteDebug === "function" ? M._malloc(64) : 0;
+    const wmDebug = () => { if (!dbgPtr) return null; const n = M._WiiOnline_GetWiimoteDebug(0, dbgPtr); return n ? Array.from(new Uint32Array(M.HEAPU8.buffer, dbgPtr, 16)) : null; };
     const samples = []; const shots = []; const dist = { calls: 0, distinct: 0, series: [], gaps: [] };
     let lastGen = -1, lastHash = 0, lastDistinctT = 0;
     const gtimer = o.distinct ? setInterval(() => { const g = num("GetFrame"); if (g === lastGen) return; lastGen = g; dist.calls++; const w = num("FrameWidth"), h = num("FrameHeight"), p = num("FrameBuffer"); if (!w || !h || !p) return; const u = new Uint32Array(M.HEAPU8.buffer, p, w * h); let x = 2166136261; for (let i = 0; i < u.length; i++) x = Math.imul(x ^ u[i], 16777619); const t = (performance.now() - t0) / 1000; if (x !== lastHash) { lastHash = x; dist.distinct++; if (lastDistinctT) dist.gaps.push((t - lastDistinctT) * 1000); lastDistinctT = t; } const sec = Math.floor(t); dist.series[sec] = dist.series[sec] || [0, 0]; dist.series[sec][0]++; if (x !== dist.lastX) dist.series[sec][1]++; dist.lastX = x; }, 4) : null; const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -39,7 +41,7 @@ onmessage = async (ev) => {
       const stats = c("GetVideoStats", "string", [], []);
       const counter = (name) => Number(new RegExp(`(?:^|\\s)${name}:(\\d+)`).exec(stats)?.[1] ?? NaN);
       const frameGen = num("GetFrame");
-      samples.push({ wall: (performance.now() - t0) / 1000, guest, ticks: ticks(), tps: num("GetCoreTicksPerSecond"), frameGen, viScanouts: frameGen, xfbCopies: counter("xfbgen"), drawBatches: counter("drawbatch"), rasterTriangles: counter("rast"), pc: num("GetPPCPC"), jitCompiled: num("GetPpcWasmBlockCompileCount"), jitRuns: num("GetPpcWasmBlockRunCount"), vs: o.profile ? stats : undefined });
+      samples.push({ wm: o.wmdebug ? wmDebug() : undefined, wall: (performance.now() - t0) / 1000, guest, ticks: ticks(), tps: num("GetCoreTicksPerSecond"), frameGen, viScanouts: frameGen, xfbCopies: counter("xfbgen"), drawBatches: counter("drawbatch"), rasterTriangles: counter("rast"), pc: num("GetPPCPC"), jitCompiled: num("GetPpcWasmBlockCompileCount"), jitRuns: num("GetPpcWasmBlockRunCount"), vs: o.profile ? stats : undefined });
       await sleep(o.sampleMs ?? 250);
     }
     postMessage({ type: "result", cfg: o, dist, shots, inputs, title: c("GetCoreTitle", "string", [], []), videoStats: c("GetVideoStats", "string", [], []), timingStats: c("GetPpcWasmHelperStats", "string", [], []), samples, ua: navigator.userAgent, cores: navigator.hardwareConcurrency });

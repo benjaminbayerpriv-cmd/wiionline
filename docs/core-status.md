@@ -95,3 +95,7 @@ Hinweis: Codex implementiert den maßgeblichen TypeScript-Adapter (`src/dolphin-
 
 ## Nächste Schritte
 Vollständigen `all`-Lauf von leer prüfen; CI-Cache für den ~1-h-Build; echtes Homebrew mit libogc (z. B. Text über EXI/Konsole) statt handgebautem DOL; Frames anbinden (mit AV: Software-Raster → `frame`); Wiimote-HLE; Browser-Matrix.
+
+## Wii-Play-Eingabepfad im Kern geprüft (2026-11-08)
+- **Exportliste:** Die Kernartefakte (u. a. `42f67e40…`, `ef97f9fb…`) exportieren `_WiiOnline_SetWiimote`, `_ClearWiimote`, `_GetWiimoteDebug`, `_malloc`, `_free`. Auf `Module` stehen aber nur `HEAPU8` (kein `HEAPU32`). Die Meldung „debug export unavailable“ im Adapter kommt von dessen Prüfung `module.HEAPU32 instanceof Uint32Array`, nicht von einem fehlenden Export. Lösung im Adapter: `new Uint32Array(module.HEAPU8.buffer, ptr, 16)`. Kein Kernfix nötig.
+- **Gastpfad:** Mit Wii Play (RVZ, Software Renderer) kommt A über `SetWiimote` bis in `BuildDesiredWiimoteState` (`last_hex` 0x0800 = A, `build_count` steigt, beim Loslassen 0). Die Gastanzeige wechselt danach von den Warnseiten zum Wiimote-Zeiger-Bildschirm mit sichtbarem Zeiger (Hash-Wechsel 26 s → 36 s → 46 s; 3 von 4 Tastendrücken reichten, bis der Zeiger sichtbar war). Belege: `docs/evidence/wii-play-input-debug.json`; Bilder nur lokal. Grenze: ein Lauf, Software Renderer, kein OGL; ob ein früher Druck (Warnseite noch nicht annahmebereit) verworfen wird, ist nicht einzeln geprüft.
