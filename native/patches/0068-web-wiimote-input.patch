@@ -1,0 +1,276 @@
+--- a/Source/Core/Core/HW/WiimoteEmu/WiimoteEmu.cpp
++++ b/Source/Core/Core/HW/WiimoteEmu/WiimoteEmu.cpp
+@@ -4,8 +4,12 @@
+ #include "Core/HW/WiimoteEmu/WiimoteEmu.h"
+ 
+ #include <algorithm>
++#include <array>
++#include <cmath>
++#include <cstdint>
+ #include <fstream>
+ #include <memory>
++#include <mutex>
+ #include <optional>
+ #include <string_view>
+ 
+@@ -20,6 +24,7 @@
+ #include "Common/MathUtil.h"
+ 
+ #include "Core/Config/MainSettings.h"
++#include "Core/Config/SYSCONFSettings.h"
+ #include "Core/Core.h"
+ #include "Core/HW/Wiimote.h"
+ 
+@@ -39,6 +44,7 @@
+ #include "Core/HW/WiimoteEmu/Extension/UDrawTablet.h"
+ 
+ #include "InputCommon/ControllerEmu/ControlGroup/Attachments.h"
++#include "InputCommon/InputConfig.h"
+ #include "InputCommon/ControllerEmu/ControlGroup/Buttons.h"
+ #include "InputCommon/ControllerEmu/ControlGroup/ControlGroup.h"
+ #include "InputCommon/ControllerEmu/ControlGroup/Cursor.h"
+@@ -49,6 +55,45 @@
+ #include "InputCommon/ControllerEmu/ControlGroup/IRPassthrough.h"
+ #include "InputCommon/ControllerEmu/ControlGroup/ModifySettingsButton.h"
+ #include "InputCommon/ControllerEmu/ControlGroup/Tilt.h"
++
++// wiionline: Web-Eingabe-Override (siehe docs/wiimote-input-proposal.md). Der Browser-Worker setzt einen
++// Zustand pro Slot; BuildDesiredWiimoteState uebernimmt Tasten, Beschleunigung und IR-Punkte daraus.
++namespace
++{
++struct WebWiimoteSlot
++{
++  bool active = false;
++  std::uint32_t buttons = 0;  // Web-Maske (Bits siehe WebButtonsToHex)
++  float px = 0.5f, py = 0.5f;
++  bool visible = false;
++  float ax = 0.f, ay = 0.f, az = 1.f;  // in g
++  std::uint32_t generation = 0;        // zaehlt SetWiimote/ClearWiimote
++  std::uint32_t build_count = 0;       // BuildDesiredWiimoteState-Laeufe mit aktivem Override
++  std::uint32_t dbg_hex = 0;
++  std::uint32_t dbg_acc[3] = {};
++  std::uint32_t dbg_pt[4] = {};   // x | y << 16 (0xffff = nicht sichtbar)
++  std::uint32_t dbg_size[4] = {};
++};
++std::mutex s_web_wiimote_mutex;
++std::array<WebWiimoteSlot, 4> s_web_wiimote_slots;
++
++std::uint16_t WebButtonsToHex(std::uint32_t m)
++{
++  std::uint16_t h = 0;
++  if (m & 0x001) h |= 0x0800;  // A
++  if (m & 0x002) h |= 0x0400;  // B
++  if (m & 0x004) h |= 0x0200;  // ONE
++  if (m & 0x008) h |= 0x0100;  // TWO
++  if (m & 0x010) h |= 0x0010;  // PLUS
++  if (m & 0x020) h |= 0x1000;  // MINUS
++  if (m & 0x040) h |= 0x8000;  // HOME
++  if (m & 0x080) h |= 0x0008;  // UP
++  if (m & 0x100) h |= 0x0004;  // DOWN
++  if (m & 0x200) h |= 0x0001;  // LEFT
++  if (m & 0x400) h |= 0x0002;  // RIGHT
++  return h;
++}
++}  // namespace
+ 
+ namespace WiimoteEmu
+ {
+@@ -528,6 +573,63 @@
+   static_cast<Extension*>(
+       m_attachments->GetAttachmentList()[m_attachments->GetSelectedAttachment()].get())
+       ->BuildDesiredExtensionState(&target_state->extension);
++
++  // wiionline: Web-Override (nur wenn der Browser fuer diesen Slot aktiv gesetzt hat).
++  {
++    WebWiimoteSlot snap;
++    {
++      const std::lock_guard<std::mutex> lock(s_web_wiimote_mutex);
++      if (m_index < s_web_wiimote_slots.size())
++        snap = s_web_wiimote_slots[m_index];
++    }
++    if (snap.active)
++    {
++      target_state->buttons.hex = WebButtonsToHex(snap.buttons);
++      target_state->acceleration =
++          ConvertAccelData(Common::Vec3(snap.ax, snap.ay, snap.az) * float(GRAVITY_ACCELERATION),
++                           ACCEL_ZERO_G << 2, ACCEL_ONE_G << 2);
++      if (snap.visible && sensor_bar_state == SensorBarState::Enabled)
++      {
++        // Gleiche Geometrie wie EmulatePoint (Dynamics.cpp): Abstand 2 m, Sprung auf Zielwinkel.
++        const bool sensor_bar_on_top = Config::Get(Config::SYSCONF_SENSOR_BAR_POSITION) != 0;
++        const float height = float(m_ir->GetVerticalOffset()) * (sensor_bar_on_top ? 1 : -1);
++        const float yaw_scale = float(m_ir->GetTotalYaw()) / 2;
++        const float pitch_scale = float(m_ir->GetTotalPitch()) / 2;
++        const float cursor_x = 2.f * snap.px - 1.f;  // rechts positiv
++        const float cursor_y = 1.f - 2.f * snap.py;  // Dolphin-Cursor: oben positiv
++        const Common::Vec3 angle(pitch_scale * -cursor_y, 0, yaw_scale * -cursor_x);
++        const Common::Vec3 position(0, 2.f, -height);
++        const Common::Matrix44 transform =
++            Common::Matrix44::FromMatrix33(GetRotationalMatrix(-angle)) *
++            Common::Matrix44::Translate(-position);
++        target_state->camera_points = CameraLogic::GetCameraPoints(
++            transform,
++            Common::Vec2(m_fov_x_setting.GetValue(), m_fov_y_setting.GetValue()) / 360 *
++                float(MathUtil::TAU));
++      }
++      else
++      {
++        target_state->camera_points = DesiredWiimoteState::DEFAULT_CAMERA;
++      }
++
++      const std::lock_guard<std::mutex> lock(s_web_wiimote_mutex);
++      WebWiimoteSlot& slot = s_web_wiimote_slots[m_index];
++      if (slot.active && slot.generation == snap.generation)
++      {
++        slot.build_count++;
++        slot.dbg_hex = target_state->buttons.hex;
++        slot.dbg_acc[0] = target_state->acceleration.value.x;
++        slot.dbg_acc[1] = target_state->acceleration.value.y;
++        slot.dbg_acc[2] = target_state->acceleration.value.z;
++        for (size_t i = 0; i < 4; ++i)
++        {
++          const auto& p = target_state->camera_points[i];
++          slot.dbg_pt[i] = std::uint32_t(p.position.x) | (std::uint32_t(p.position.y) << 16);
++          slot.dbg_size[i] = p.size;
++        }
++      }
++    }
++  }
+ }
+ 
+ u8 Wiimote::GetWiimoteDeviceIndex() const
+@@ -681,6 +783,13 @@
+   m_dpad->GetState(&buttons.hex, IsSideways() ? dpad_sideways_bitmasks : dpad_bitmasks,
+                    m_input_override_function);
+ 
++  // wiionline: Web-Override gilt auch fuer das Aufwecken/Verbinden der Remote per Tastendruck.
++  {
++    const std::lock_guard<std::mutex> lock(s_web_wiimote_mutex);
++    if (m_index < s_web_wiimote_slots.size() && s_web_wiimote_slots[m_index].active)
++      buttons.hex = WebButtonsToHex(s_web_wiimote_slots[m_index].buttons);
++  }
++
+   return buttons;
+ }
+ 
+@@ -967,3 +1076,120 @@
+ }
+ 
+ }  // namespace WiimoteEmu
++
++// ---------------------------------------------------------------------------
++// wiionline: C-ABI fuer den Browser-Worker (Besitz: Kern-Zweig).
++// Slot 0..3 (bisher nur Slot 0 vom Adapter benutzt). Ungueltiger Slot: kein Effekt.
++// ---------------------------------------------------------------------------
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#define WIIONLINE_EXPORT EMSCRIPTEN_KEEPALIVE
++#else
++#define WIIONLINE_EXPORT
++#endif
++
++static float WebClamp(float v, float lo, float hi, float fallback)
++{
++  if (std::isnan(v))
++    return fallback;
++  return std::clamp(v, lo, hi);
++}
++
++extern "C"
++{
++// buttons: Bitmaske 0x001 A, 0x002 B, 0x004 ONE, 0x008 TWO, 0x010 PLUS, 0x020 MINUS, 0x040 HOME,
++// 0x080 UP, 0x100 DOWN, 0x200 LEFT, 0x400 RIGHT; unbekannte Bits werden ignoriert.
++// pointer_x/y: 0..1, Ursprung oben links; NaN => Zeiger unsichtbar. accel in g (NaN => 0,0,1 je Achse
++// neutral), auf +-8 g begrenzt. Danach ist der Override fuer den Slot aktiv.
++WIIONLINE_EXPORT void WiiOnline_SetWiimote(int slot, std::uint32_t buttons, float pointer_x,
++                                           float pointer_y, int pointer_visible, float accel_x,
++                                           float accel_y, float accel_z)
++{
++  if (slot < 0 || slot >= 4)
++    return;
++  const bool px_nan = std::isnan(pointer_x), py_nan = std::isnan(pointer_y);
++  const std::lock_guard<std::mutex> lock(s_web_wiimote_mutex);
++  WebWiimoteSlot& s = s_web_wiimote_slots[slot];
++  s.active = true;
++  s.buttons = buttons & 0x7ffu;
++  s.px = WebClamp(pointer_x, 0.f, 1.f, 0.5f);
++  s.py = WebClamp(pointer_y, 0.f, 1.f, 0.5f);
++  s.visible = pointer_visible != 0 && !px_nan && !py_nan;
++  s.ax = WebClamp(accel_x, -8.f, 8.f, 0.f);
++  s.ay = WebClamp(accel_y, -8.f, 8.f, 0.f);
++  s.az = WebClamp(accel_z, -8.f, 8.f, 1.f);
++  s.generation++;
++}
++
++// Beendet den Override: Dolphins eigene Konfiguration gilt wieder; gehaltene Tasten sind weg.
++WIIONLINE_EXPORT void WiiOnline_ClearWiimote(int slot)
++{
++  if (slot < 0 || slot >= 4)
++    return;
++  const std::lock_guard<std::mutex> lock(s_web_wiimote_mutex);
++  WebWiimoteSlot& s = s_web_wiimote_slots[slot];
++  const std::uint32_t gen = s.generation + 1;
++  s = WebWiimoteSlot{};
++  s.generation = gen;
++}
++
++// Schreibt 16 uint32 nach out (Puffer >= 64 Byte) und liefert 16; bei ungueltigem Slot oder out==nullptr 0.
++// [0] active (0/1)   [1] generation   [2] build_count (BuildDesiredWiimoteState-Laeufe mit Override)
++// [3] zuletzt gebaute ButtonData.hex   [4..6] Beschleunigung x,y,z (10 Bit)
++// [7..10] IR-Punkt 0..3 als x | y<<16 (0xffff/0xffff = nicht sichtbar)   [11..14] Punktgroessen
++// [15] gesetzte Web-Tastenmaske. Werte [3..14] sind 0, solange build_count == 0.
++WIIONLINE_EXPORT std::uint32_t WiiOnline_GetWiimoteDebug(int slot, std::uint32_t* out)
++{
++  if (slot < 0 || slot >= 4 || out == nullptr)
++    return 0;
++  const std::lock_guard<std::mutex> lock(s_web_wiimote_mutex);
++  const WebWiimoteSlot& s = s_web_wiimote_slots[slot];
++  out[0] = s.active ? 1 : 0;
++  out[1] = s.generation;
++  out[2] = s.build_count;
++  out[3] = s.dbg_hex;
++  for (int i = 0; i < 3; ++i)
++    out[4 + i] = s.dbg_acc[i];
++  for (int i = 0; i < 4; ++i)
++  {
++    out[7 + i] = s.dbg_pt[i];
++    out[11 + i] = s.dbg_size[i];
++  }
++  out[15] = s.buttons;
++  return 16;
++}
++
++// Testzugang: ruft den echten Wiimote::PrepareInput-/BuildDesiredWiimoteState-Pfad der emulierten
++// Remote auf (die BT-Verbindung des Gastes ist dafuer nicht noetig) und liefert das Ergebnis.
++// out: 16 uint32: [0] ButtonData.hex  [1..3] Beschleunigung x,y,z (10 Bit)  [4..7] IR-Punkt 0..3 als
++// x | y<<16 (0xffff = nicht sichtbar)  [8..11] Punktgroessen  [12] GetCurrentlyPressedButtons().hex
++// [13..15] 0. Rueckgabe 1 = ok, 0 = ungueltiger Slot/keine emulierte Wiimote/out==nullptr.
++// Nur fuer Tests; laeuft im aufrufenden Thread (nicht synchron mit dem CPU-Thread).
++WIIONLINE_EXPORT int WiiOnline_TestPrepareInput(int slot, std::uint32_t* out)
++{
++  if (slot < 0 || slot >= 4 || out == nullptr)
++    return 0;
++  ::InputConfig* config = ::Wiimote::GetConfig();
++  if (config == nullptr || slot >= config->GetControllerCount())  // GetController wirft sonst (kein Exception-Support => Abbruch)
++    return 0;
++  auto* wiimote = dynamic_cast<WiimoteEmu::Wiimote*>(config->GetController(slot));
++  if (wiimote == nullptr)
++    return 0;
++  WiimoteEmu::DesiredWiimoteState state;
++  wiimote->PrepareInput(&state, WiimoteCommon::HIDWiimote::SensorBarState::Enabled);
++  for (int i = 0; i < 16; ++i)
++    out[i] = 0;
++  out[0] = state.buttons.hex;
++  out[1] = state.acceleration.value.x;
++  out[2] = state.acceleration.value.y;
++  out[3] = state.acceleration.value.z;
++  for (int i = 0; i < 4; ++i)
++  {
++    out[4 + i] = std::uint32_t(state.camera_points[i].position.x) |
++                 (std::uint32_t(state.camera_points[i].position.y) << 16);
++    out[8 + i] = state.camera_points[i].size;
++  }
++  out[12] = wiimote->GetCurrentlyPressedButtons().hex;
++  return 1;
++}
++}

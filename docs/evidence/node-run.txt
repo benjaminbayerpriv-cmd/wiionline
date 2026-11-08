@@ -1,0 +1,21 @@
+# node v22.23.1, arm64, 2026-11-07T21:55:23Z
+17b792166f2a8a06ad64f5344f95c49debcc0fb645e8c9644c814a996a0a88c0  dolphin-core-upstream.js
+5c420f1c5cc1fc326188106bbc64c67a615748f50c2e415fa47d740cc8930bec  dolphin-core-upstream.wasm
+## hello_wii.dol cpu=interpreter
+info: dolphin=e22551eae1c84a7e4d0b6a5c519ef4ed4ef69df1 emscripten=5.0.7 load ms 149
+BootDisc 1 Boot submitted to Dolphin core
+{"jitCompiled":0,"jitRuns":0,"done":true,"ms":540,"pc":"80004078","isWii":1,"state":"Running","cpuName":"Interpreter","mem":["5749494f","4e4c494e","7a314","f3be7791","444f4e45"],"expected":{"sum":"7a314","lcg":"f3be7791"}}
+## hello_wii.dol cpu=cached
+info: dolphin=e22551eae1c84a7e4d0b6a5c519ef4ed4ef69df1 emscripten=5.0.7 load ms 104
+BootDisc 1 Boot submitted to Dolphin core
+{"jitCompiled":0,"jitRuns":0,"done":true,"ms":580,"pc":"80004078","isWii":1,"state":"Running","cpuName":"Cached Interpreter","mem":["5749494f","4e4c494e","7a314","f3be7791","444f4e45"],"expected":{"sum":"7a314","lcg":"f3be7791"}}
+## bench_wii.dol (30M LCG-Iterationen, 90M PPC-Befehle) cpu=interpreter
+{"jitCompiled":0,"jitRuns":0,"done":true,"ms":3740,"pc":"80004078","isWii":1,"state":"Running","cpuName":"Interpreter","mem":["5749494f","4e4c494e","7a314","9cc9af81","444f4e45"],"expected":{"sum":"7a314","lcg":"9cc9af81"}}
+## bench_wii.dol (30M LCG-Iterationen, 90M PPC-Befehle) cpu=cached
+{"jitCompiled":0,"jitRuns":0,"done":true,"ms":1191,"pc":"80004078","isWii":1,"state":"Running","cpuName":"Cached Interpreter","mem":["5749494f","4e4c494e","7a314","9cc9af81","444f4e45"],"expected":{"sum":"7a314","lcg":"9cc9af81"}}
+## bench cached+wasmjit=1
+wasmjit undefined
+{"jitCompiled":5,"jitRuns":30001001,"done":true,"ms":1038,"pc":"80004078","isWii":1,"state":"Running","cpuName":"Cached Interpreter","mem":["5749494f","4e4c494e","7a314","9cc9af81","444f4e45"],"expected":{"sum":"7a314","lcg":"9cc9af81"}}
+## adapter
+{"ok":true,"pc":"80004078","states":["idle","loading","ready","running"],"lastMetrics":{"type":"metrics","fps":0,"emulationSpeed":0.8335941780605682}}
+{"ok":true,"pc":"80004078","states":["idle","loading","ready","running"],"lastMetrics":{"type":"metrics","fps":0,"emulationSpeed":0.5655380489961974}}

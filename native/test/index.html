@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>wiionline core test</title>
+<pre id="out">Starte ...</pre>
+<script type="module">
+const q = new URLSearchParams(location.search), out = document.getElementById("out");
+const lines = [];
+const w = new Worker("core-worker.mjs", { type: "module" });
+w.onmessage = (e) => {
+  if (e.data.type === "log") { lines.push(e.data.m); out.textContent = lines.join("\n"); return; }
+  window.RESULT = e.data; out.textContent = JSON.stringify(e.data, null, 1) + "\n\n" + lines.join("\n");
+  document.title = e.data.verdict ? "PASS" : "FAIL";
+};
+w.onerror = (e) => { window.RESULT = { verdict: false, error: String(e.message) }; out.textContent = "Worker-Fehler: " + e.message; document.title = "FAIL"; };
+w.postMessage({ cpu: q.get("cpu") || "interpreter", trace: q.has("trace"), jit: Number(q.get("jit") || 0), dolUrl: q.get("dol") === "bench" ? "bench_wii.dol" : "hello_wii.dol", expectedUrl: q.get("dol") === "bench" ? "bench_expected.json" : "expected.json" });
+</script>

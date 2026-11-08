@@ -1,0 +1,455 @@
+{
+ "cached": {
+  "when": "2026-11-07T22:38:23.620Z",
+  "node": "v22.23.1",
+  "cpu": "cached",
+  "dol": {
+   "image": "devkitpro/devkitppc@sha256:04bab308c032848c1ca5a09c02b4aaa4d505efd7996aab05b9a4eb15231b2868",
+   "result_symbol": "g_wpad_result",
+   "result_addr": 2147816992,
+   "dol_sha256": "d5f7a98092a4f49680df2e4c4c28c06c271209957ca37c69189db547c9c43505"
+  },
+  "passed": 27,
+  "total": 27,
+  "pass": true,
+  "results": [
+   {
+    "name": "Gast-Homebrew laeuft (Magic, Zaehler steigt)",
+    "pass": true,
+    "detail": "seq=12"
+   },
+   {
+    "name": "Wii-Modus",
+    "pass": true,
+    "detail": ""
+   },
+   {
+    "name": "Gast-Schleife laeuft weiter (seq steigt)",
+    "pass": true,
+    "detail": "12 -> 35"
+   },
+   {
+    "name": "Beobachtung: Wiimote 0 ist beim Boot bereits verbunden (Dolphin-BT-HLE verbindet emulierte Remotes selbst)",
+    "pass": true,
+    "detail": "probe=0"
+   },
+   {
+    "name": "Gast: Wiimote verbunden (WPAD_Probe == 0, Typ gelesen)",
+    "pass": true,
+    "detail": "type=1"
+   },
+   {
+    "name": "Gast sieht Taste A",
+    "pass": true,
+    "detail": "erwartet 0x8, Gast 0x8"
+   },
+   {
+    "name": "Gast sieht Taste B",
+    "pass": true,
+    "detail": "erwartet 0x4, Gast 0x4"
+   },
+   {
+    "name": "Gast sieht Taste ONE",
+    "pass": true,
+    "detail": "erwartet 0x2, Gast 0x2"
+   },
+   {
+    "name": "Gast sieht Taste TWO",
+    "pass": true,
+    "detail": "erwartet 0x1, Gast 0x1"
+   },
+   {
+    "name": "Gast sieht Taste PLUS",
+    "pass": true,
+    "detail": "erwartet 0x1000, Gast 0x1000"
+   },
+   {
+    "name": "Gast sieht Taste MINUS",
+    "pass": true,
+    "detail": "erwartet 0x10, Gast 0x10"
+   },
+   {
+    "name": "Gast sieht Taste HOME",
+    "pass": true,
+    "detail": "erwartet 0x80, Gast 0x80"
+   },
+   {
+    "name": "Gast sieht Taste UP",
+    "pass": true,
+    "detail": "erwartet 0x800, Gast 0x800"
+   },
+   {
+    "name": "Gast sieht Taste DOWN",
+    "pass": true,
+    "detail": "erwartet 0x400, Gast 0x400"
+   },
+   {
+    "name": "Gast sieht Taste LEFT",
+    "pass": true,
+    "detail": "erwartet 0x100, Gast 0x100"
+   },
+   {
+    "name": "Gast sieht Taste RIGHT",
+    "pass": true,
+    "detail": "erwartet 0x200, Gast 0x200"
+   },
+   {
+    "name": "Gast sieht alle 11 Tasten",
+    "pass": true,
+    "detail": "Gast 0x1f9f erwartet 0x1f9f"
+   },
+   {
+    "name": "Loslassen: keine gehaltene Taste im Gast",
+    "pass": true,
+    "detail": ""
+   },
+   {
+    "name": "Gast sieht IR Mitte: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":443,\"ry\":452,\"size\":0},{\"vis\":1,\"rx\":580,\"ry\":196,\"size\":0}] nativ [{\"x\":580,\"y\":452},{\"x\":443,\"y\":452}]"
+   },
+   {
+    "name": "Gast sieht IR links-oben: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":137,\"ry\":207,\"size\":0},{\"vis\":1,\"rx\":537,\"ry\":211,\"size\":0}] nativ [{\"x\":886,\"y\":207},{\"x\":742,\"y\":211}]"
+   },
+   {
+    "name": "Gast sieht IR rechts-oben: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":742,\"ry\":211,\"size\":0},{\"vis\":1,\"rx\":630,\"ry\":207,\"size\":0}] nativ [{\"x\":281,\"y\":211},{\"x\":137,\"y\":207}]"
+   },
+   {
+    "name": "Gast sieht IR links-unten: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":136,\"ry\":706,\"size\":0},{\"vis\":1,\"rx\":538,\"ry\":186,\"size\":0}] nativ [{\"x\":887,\"y\":706},{\"x\":741,\"y\":698}]"
+   },
+   {
+    "name": "Gast sieht IR rechts-unten: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":741,\"ry\":698,\"size\":0},{\"vis\":1,\"rx\":631,\"ry\":194,\"size\":0}] nativ [{\"x\":282,\"y\":698},{\"x\":136,\"y\":706}]"
+   },
+   {
+    "name": "visible=0: Gast sieht keine IR-Punkte",
+    "pass": true,
+    "detail": "[{\"vis\":0,\"rx\":0,\"ry\":1023,\"size\":0},{\"vis\":0,\"rx\":0,\"ry\":1023,\"size\":0}]"
+   },
+   {
+    "name": "Gast sieht Ruhe-Beschleunigung (0,0,1 g) wie nativ",
+    "pass": true,
+    "detail": "Gast [512,512,616] nativ 512,512,616"
+   },
+   {
+    "name": "Gast sieht x=+1 g wie nativ",
+    "pass": true,
+    "detail": "Gast [616,512,616] nativ 616,512,616"
+   },
+   {
+    "name": "Clear: Gast sieht keine gehaltene Taste mehr",
+    "pass": true,
+    "detail": "held=0x0"
+   }
+  ]
+ },
+ "cached1": {
+  "when": "2026-11-07T22:38:27.259Z",
+  "node": "v22.23.1",
+  "cpu": "cached",
+  "dol": {
+   "image": "devkitpro/devkitppc@sha256:04bab308c032848c1ca5a09c02b4aaa4d505efd7996aab05b9a4eb15231b2868",
+   "result_symbol": "g_wpad_result",
+   "result_addr": 2147816992,
+   "dol_sha256": "d5f7a98092a4f49680df2e4c4c28c06c271209957ca37c69189db547c9c43505"
+  },
+  "passed": 27,
+  "total": 27,
+  "pass": true,
+  "results": [
+   {
+    "name": "Gast-Homebrew laeuft (Magic, Zaehler steigt)",
+    "pass": true,
+    "detail": "seq=7"
+   },
+   {
+    "name": "Wii-Modus",
+    "pass": true,
+    "detail": ""
+   },
+   {
+    "name": "Gast-Schleife laeuft weiter (seq steigt)",
+    "pass": true,
+    "detail": "7 -> 41"
+   },
+   {
+    "name": "Beobachtung: Wiimote 0 ist beim Boot bereits verbunden (Dolphin-BT-HLE verbindet emulierte Remotes selbst)",
+    "pass": true,
+    "detail": "probe=0"
+   },
+   {
+    "name": "Gast: Wiimote verbunden (WPAD_Probe == 0, Typ gelesen)",
+    "pass": true,
+    "detail": "type=1"
+   },
+   {
+    "name": "Gast sieht Taste A",
+    "pass": true,
+    "detail": "erwartet 0x8, Gast 0x8"
+   },
+   {
+    "name": "Gast sieht Taste B",
+    "pass": true,
+    "detail": "erwartet 0x4, Gast 0x4"
+   },
+   {
+    "name": "Gast sieht Taste ONE",
+    "pass": true,
+    "detail": "erwartet 0x2, Gast 0x2"
+   },
+   {
+    "name": "Gast sieht Taste TWO",
+    "pass": true,
+    "detail": "erwartet 0x1, Gast 0x1"
+   },
+   {
+    "name": "Gast sieht Taste PLUS",
+    "pass": true,
+    "detail": "erwartet 0x1000, Gast 0x1000"
+   },
+   {
+    "name": "Gast sieht Taste MINUS",
+    "pass": true,
+    "detail": "erwartet 0x10, Gast 0x10"
+   },
+   {
+    "name": "Gast sieht Taste HOME",
+    "pass": true,
+    "detail": "erwartet 0x80, Gast 0x80"
+   },
+   {
+    "name": "Gast sieht Taste UP",
+    "pass": true,
+    "detail": "erwartet 0x800, Gast 0x800"
+   },
+   {
+    "name": "Gast sieht Taste DOWN",
+    "pass": true,
+    "detail": "erwartet 0x400, Gast 0x400"
+   },
+   {
+    "name": "Gast sieht Taste LEFT",
+    "pass": true,
+    "detail": "erwartet 0x100, Gast 0x100"
+   },
+   {
+    "name": "Gast sieht Taste RIGHT",
+    "pass": true,
+    "detail": "erwartet 0x200, Gast 0x200"
+   },
+   {
+    "name": "Gast sieht alle 11 Tasten",
+    "pass": true,
+    "detail": "Gast 0x1f9f erwartet 0x1f9f"
+   },
+   {
+    "name": "Loslassen: keine gehaltene Taste im Gast",
+    "pass": true,
+    "detail": ""
+   },
+   {
+    "name": "Gast sieht IR Mitte: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":443,\"ry\":452,\"size\":0},{\"vis\":1,\"rx\":580,\"ry\":196,\"size\":0}] nativ [{\"x\":580,\"y\":452},{\"x\":443,\"y\":452}]"
+   },
+   {
+    "name": "Gast sieht IR links-oben: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":137,\"ry\":207,\"size\":0},{\"vis\":1,\"rx\":537,\"ry\":211,\"size\":0}] nativ [{\"x\":886,\"y\":207},{\"x\":742,\"y\":211}]"
+   },
+   {
+    "name": "Gast sieht IR rechts-oben: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":742,\"ry\":211,\"size\":0},{\"vis\":1,\"rx\":630,\"ry\":207,\"size\":0}] nativ [{\"x\":281,\"y\":211},{\"x\":137,\"y\":207}]"
+   },
+   {
+    "name": "Gast sieht IR links-unten: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":136,\"ry\":706,\"size\":0},{\"vis\":1,\"rx\":538,\"ry\":186,\"size\":0}] nativ [{\"x\":887,\"y\":706},{\"x\":741,\"y\":698}]"
+   },
+   {
+    "name": "Gast sieht IR rechts-unten: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":741,\"ry\":698,\"size\":0},{\"vis\":1,\"rx\":631,\"ry\":194,\"size\":0}] nativ [{\"x\":282,\"y\":698},{\"x\":136,\"y\":706}]"
+   },
+   {
+    "name": "visible=0: Gast sieht keine IR-Punkte",
+    "pass": true,
+    "detail": "[{\"vis\":0,\"rx\":0,\"ry\":1023,\"size\":0},{\"vis\":0,\"rx\":0,\"ry\":1023,\"size\":0}]"
+   },
+   {
+    "name": "Gast sieht Ruhe-Beschleunigung (0,0,1 g) wie nativ",
+    "pass": true,
+    "detail": "Gast [512,512,616] nativ 512,512,616"
+   },
+   {
+    "name": "Gast sieht x=+1 g wie nativ",
+    "pass": true,
+    "detail": "Gast [616,512,616] nativ 616,512,616"
+   },
+   {
+    "name": "Clear: Gast sieht keine gehaltene Taste mehr",
+    "pass": true,
+    "detail": "held=0x0"
+   }
+  ]
+ },
+ "interpreter": {
+  "when": "2026-11-07T22:38:20.057Z",
+  "node": "v22.23.1",
+  "cpu": "interpreter",
+  "dol": {
+   "image": "devkitpro/devkitppc@sha256:04bab308c032848c1ca5a09c02b4aaa4d505efd7996aab05b9a4eb15231b2868",
+   "result_symbol": "g_wpad_result",
+   "result_addr": 2147816992,
+   "dol_sha256": "d5f7a98092a4f49680df2e4c4c28c06c271209957ca37c69189db547c9c43505"
+  },
+  "passed": 27,
+  "total": 27,
+  "pass": true,
+  "results": [
+   {
+    "name": "Gast-Homebrew laeuft (Magic, Zaehler steigt)",
+    "pass": true,
+    "detail": "seq=6"
+   },
+   {
+    "name": "Wii-Modus",
+    "pass": true,
+    "detail": ""
+   },
+   {
+    "name": "Gast-Schleife laeuft weiter (seq steigt)",
+    "pass": true,
+    "detail": "6 -> 7"
+   },
+   {
+    "name": "Beobachtung: Wiimote 0 ist beim Boot bereits verbunden (Dolphin-BT-HLE verbindet emulierte Remotes selbst)",
+    "pass": true,
+    "detail": "probe=0"
+   },
+   {
+    "name": "Gast: Wiimote verbunden (WPAD_Probe == 0, Typ gelesen)",
+    "pass": true,
+    "detail": "type=0"
+   },
+   {
+    "name": "Gast sieht Taste A",
+    "pass": true,
+    "detail": "erwartet 0x8, Gast 0x8"
+   },
+   {
+    "name": "Gast sieht Taste B",
+    "pass": true,
+    "detail": "erwartet 0x4, Gast 0x4"
+   },
+   {
+    "name": "Gast sieht Taste ONE",
+    "pass": true,
+    "detail": "erwartet 0x2, Gast 0x2"
+   },
+   {
+    "name": "Gast sieht Taste TWO",
+    "pass": true,
+    "detail": "erwartet 0x1, Gast 0x1"
+   },
+   {
+    "name": "Gast sieht Taste PLUS",
+    "pass": true,
+    "detail": "erwartet 0x1000, Gast 0x1000"
+   },
+   {
+    "name": "Gast sieht Taste MINUS",
+    "pass": true,
+    "detail": "erwartet 0x10, Gast 0x10"
+   },
+   {
+    "name": "Gast sieht Taste HOME",
+    "pass": true,
+    "detail": "erwartet 0x80, Gast 0x80"
+   },
+   {
+    "name": "Gast sieht Taste UP",
+    "pass": true,
+    "detail": "erwartet 0x800, Gast 0x800"
+   },
+   {
+    "name": "Gast sieht Taste DOWN",
+    "pass": true,
+    "detail": "erwartet 0x400, Gast 0x400"
+   },
+   {
+    "name": "Gast sieht Taste LEFT",
+    "pass": true,
+    "detail": "erwartet 0x100, Gast 0x100"
+   },
+   {
+    "name": "Gast sieht Taste RIGHT",
+    "pass": true,
+    "detail": "erwartet 0x200, Gast 0x200"
+   },
+   {
+    "name": "Gast sieht alle 11 Tasten",
+    "pass": true,
+    "detail": "Gast 0x1f9f erwartet 0x1f9f"
+   },
+   {
+    "name": "Loslassen: keine gehaltene Taste im Gast",
+    "pass": true,
+    "detail": ""
+   },
+   {
+    "name": "Gast sieht IR Mitte: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":443,\"ry\":452,\"size\":0},{\"vis\":1,\"rx\":580,\"ry\":196,\"size\":0}] nativ [{\"x\":580,\"y\":452},{\"x\":443,\"y\":452}]"
+   },
+   {
+    "name": "Gast sieht IR links-oben: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":137,\"ry\":207,\"size\":0},{\"vis\":1,\"rx\":537,\"ry\":211,\"size\":0}] nativ [{\"x\":886,\"y\":207},{\"x\":742,\"y\":211}]"
+   },
+   {
+    "name": "Gast sieht IR rechts-oben: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":742,\"ry\":211,\"size\":0},{\"vis\":1,\"rx\":630,\"ry\":207,\"size\":0}] nativ [{\"x\":281,\"y\":211},{\"x\":137,\"y\":207}]"
+   },
+   {
+    "name": "Gast sieht IR links-unten: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":136,\"ry\":706,\"size\":0},{\"vis\":1,\"rx\":538,\"ry\":186,\"size\":0}] nativ [{\"x\":887,\"y\":706},{\"x\":741,\"y\":698}]"
+   },
+   {
+    "name": "Gast sieht IR rechts-unten: Punkt 0 exakt (gespiegelt), Punkt 1 untere 8 Bit",
+    "pass": true,
+    "detail": "Gast [{\"vis\":1,\"rx\":741,\"ry\":698,\"size\":0},{\"vis\":1,\"rx\":631,\"ry\":194,\"size\":0}] nativ [{\"x\":282,\"y\":698},{\"x\":136,\"y\":706}]"
+   },
+   {
+    "name": "visible=0: Gast sieht keine IR-Punkte",
+    "pass": true,
+    "detail": "[{\"vis\":0,\"rx\":0,\"ry\":1023,\"size\":0},{\"vis\":0,\"rx\":0,\"ry\":1023,\"size\":0}]"
+   },
+   {
+    "name": "Gast sieht Ruhe-Beschleunigung (0,0,1 g) wie nativ",
+    "pass": true,
+    "detail": "Gast [512,512,616] nativ 512,512,616"
+   },
+   {
+    "name": "Gast sieht x=+1 g wie nativ",
+    "pass": true,
+    "detail": "Gast [616,512,616] nativ 616,512,616"
+   },
+   {
+    "name": "Clear: Gast sieht keine gehaltene Taste mehr",
+    "pass": true,
+    "detail": "held=0x0"
+   }
+  ]
+ }
+}
