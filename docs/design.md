@@ -1,2 +1,3 @@
 # Visual direction
-Console utility, not a marketing page. Snow #f3f7fa, porcelain #ffffff, ink #213442, Wii blue #087fae, line #cbd9e1, error #a32935. Avenir Next for friendly console typography, system fallback. Centered 4:3 screen with horizontal console controls below and file/settings beside it on wide displays; stack on phones. Quiet borders, rounded screen housing, no automatic motion. The screen is the distinctive focal element; remove decorative cards and fabricated library tiles. Actual runtime status remains visible.
+
+Dark console utility requested by the user. Deep slate #101820, panel #172630, screen #0b151e, text #e3edf4, muted #a9bfce, Wii blue #69cef5, border #344b5b and error #ff9eaa. Avenir Next with system fallback. Centered 4:3 screen and quiet console controls, adjacent software and input panels on desktop, stacked on phones. No automatic motion. The actual runtime status remains visible. Browser form controls use color-scheme: dark.

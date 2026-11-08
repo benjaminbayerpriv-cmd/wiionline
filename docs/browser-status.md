@@ -5,3 +5,51 @@ Implemented on codex/browser-shell: Vite/TypeScript shell, dedicated module work
 Validation: six lifecycle/file tests pass; TypeScript and Vite production build pass. Actual in-app browser verified missing-adapter handling and retry; start/load remain disabled without a core. COOP/COEP are present on the development server and shared memory is reported available. No native core, genuine frame, CPU execution, audio or FPS has been validated by these checks. The PCM/image consumers still need integration against genuine core output.
 
 Coordination: remote graphics branch claude/browser-av has an initial assessment. Local Claude Desktop session "Dolphin WebAssembly Portierung" was found running and received Codex's coordination message. The core agent published commit 9ac4a6a on claude/core-wasm with Dolphin e22551eae1c84a7e4d0b6a5c519ef4ed4ef69df1, Emscripten 5.0.7 and 66 patches from dougchansan/wasm-dolphin. The full Dolphin SHA was independently verified against upstream GitHub. The branch contains docs/upstream.json and native/toolchain.lock; these supersede the original candidate in main once integrated. Build and real execution remain unverified. Codex posted the new pins and a request to reassess renderer reuse in PR #1. Do not build a second incompatible upstream in parallel.
+
+## Native adapter follow-up (codex/core-integration)
+
+Implemented the bridge to core ABI 1 with actual exported function names, small homebrew FS staging, asynchronous boot-state checking, pause/resume/stop and AV frame delivery. Imported the already-merged AV work from main. Added local native-artifact installer and a production adapter build. Eleven fixture/lifecycle tests and the AV contract test pass; none is a real emulation test. Native binaries and XFB-producing homebrew are still required for end-to-end verification. Wii input and native audio remain disconnected and are reported as such.
+
+## Real native integration verified
+
+Native artifacts were located on the Mac, installed with core:install, and the actual WASM core executed Codex's own VI/XFB DOL. Node checks passed guest marker, Wii mode, PC, 320x240 geometry and all eight grayscale samples. The same installed production app was tested in the in-app browser and displayed the real bars. Pause/resume/stop and a second load/start succeeded. Dark mode was requested and implemented. Results and artifact hashes: graphics/results/xfb-node.json. Browser exact pixel reads were not available via automation; browser evidence is observed image and lifecycle state.
+
+This supersedes earlier notes that real core output was unavailable. It does not establish games, GX rendering, input, audio or speed. The core agent has unpublished native fixes used by the locally successful build; publish those before claiming full clean-checkout reproducibility. The remote AV agent went offline and Codex took over the VI/XFB test.
+
+Native source publication update: the core agent pushed 0d9a73a and 06485f2. The SHA-256 of native/src/dolphin_web_core.cpp on that branch matches the local source (8c057ba3…e9c21). The source-fix publication blocker is resolved. A full build from an empty directory remains unverified.
+
+## Parallel audio work
+
+While the native agent develops Wiimote input, Codex connected native MixAudio/AudioBuffer stereo int16 output to transferable float32 PCM chunks. Sixteen tests plus production build pass. A real installed-core run delivered 12 chunks at 48 kHz from the silent grayscale DOL; all samples were zero as expected. This verifies native mixer transport, not audible guest audio or browser speaker output. Result: graphics/results/audio-transport-node.json. Wiimote native work and browser audio work have separate owners and do not block each other.
+
+## RVZ and updated native build
+
+Installed and independently checked the core agent's 542c23a artifacts: JS bd1555ab1bde3fef0d91feb321f23f3692dd75b9c0b9021e03b6fbe40af9ac3d, WASM ef97f9fb779907502bb8277232cfe09330280516a557e79d14d17fa43e014ddb. Browser adapter now detects the real Wiimote exports. Guest input proof remains open.
+
+User supplied Wii Play (Europe, Rev 1).rvz, 167047716 bytes, correct RVZ magic. The WORKERFS path mounted it, BootDisc reached Running, and the in-app browser displayed the actual wrist-strap safety screen. That establishes RVZ read/boot/first image for this title, not gameplay, control response or full speed. The initial interpreter run logged a missing Windows-1252 font warning; bundled Dolphin replacement fonts and Cached+WASM-JIT are being tested in the follow-up run. Twenty unit/adapter tests pass; no game data is committed.
+
+## Performance-claim correction
+
+
+User observed that the reported FPS and 100% speed do not match visible game behavior. Codex had labeled native VI/XFB publication cadence as game FPS and a timer-derived ratio as game speed. Those signals were not validated against actual guest-rendered frames or observed game time, so the quantitative UI display and the speed claim have been withdrawn. Cached+JIT is enabled, but real gameplay speed remains unverified and visible slowdown remains open. Repeated scanout of the same XFB must not count as new game-rendered frames.
+
+## Browser guest input proof
+
+The 2dfdb65 WPAD DOL was run with the actual installed module and production TypeScript adapter in the in-app browser. All 25 browser guest checks passed, then passed again on a fresh worker. The test reads guest memory over WiiOnline_CopyGuest and does not use TestPrepareInput. Captured raw result: graphics/results/wpad-browser.json. Reproduction: graphics/tests/wpad/README.md. Keyboard DOM handlers/focus loss, absolute IR geometry, Wii Play responsiveness and real game speed are not covered by that result.
+
+## Übernahme durch claude/web-integration (2026-11-08)
+
+Stand: Branch claude/web-integration (von origin/codex/core-integration aefcb14). Codex' uncommittete Arbeit (src/browser-input.ts, Test, Anpassungen in main.ts/dolphin-adapter.ts und im WPAD-Diagnosetest) wurde übernommen und ergänzt.
+
+Eingabe (src/browser-input.ts): Maus über der Spielfläche gibt einen normierten IR-Zeiger (0..1, Ursprung oben links, nur im sichtbaren Bild, ohne Letterbox-Rand; sichtbar beim Hover). Linke Maustaste = A, rechte = B (gemeinsam gedrückt A+B, nötig u. a. für Wii Play), Kontextmenü unterdrückt, Zeigererfassung während Tastendruck. Tastatur: X=A, Z=B, 1, 2, Enter=+, Minus=-, H=Home, Pfeile; Tastenkombinationen mit Strg/Cmd/Alt werden nicht abgefangen. Fokusverlust (Canvas blur, Fenster blur, pointercancel) sendet den neutralen Zustand (keine Tasten, Zeiger unsichtbar, Beschleunigung 0,0,1). Bewegungssensoren (Beschleunigung) und Erweiterungen bleiben unbenutzt.
+
+Geprüft (alles mit dem aktuellen Kern, SHA-256 JS bd1555ab…ac3d, WASM ef97f9fb…4ddb, gegen dist-core/SHA256SUMS verglichen):
+- `npm ci`, `npm test` (27 Tests, 27 bestanden, davon 8 Tests in tests/browser-input.test.ts, 6 davon DOM-Ereignistests für die Eingabe mit nachgebautem EventTarget, kein echter Browser) und `npm run build` bestehen. Dazu der AV-Vertragstest mit Fake-Modul (kein Emulationsnachweis).
+- Echter Browser: `npm run test:browser:e2e` (Chrome 157 headless über CDP, eigenes Profil, COOP/COEP-Vorschauserver). 13/13 bestanden: Seite lädt, crossOriginIsolated, Kern initialisiert, xfb-bars.dol bootet, Bild mit acht Graustufen; danach echte CDP-Maus-/Tastaturereignisse über DOM-Handler und Adapter bis in den Gastspeicher des libogc-WPAD-Homebrews: Hover zeigt IR-Punkte, Zeiger nach links verschiebt die Gast-IR-X (libogc spiegelt X), links=A (0x8), links+rechts=A+B (0xc), nur rechts=B (0x4), X/Z/Pfeil links, Fokusverlust leert Tasten und IR.
+- Wii Play (Europe, Rev 1, RVZ lokal geladen, nicht committet) im gleichen Chrome: Warnbild (Handschlaufe) erscheint nach etwa einer Minute, nach gleichzeitigem Drücken von linker und rechter Maustaste folgt das Titelbild mit dem vom Mauszeiger gesteuerten Hand-Cursor. Dazu liegen Screenshots nur lokal vor. Unklar bleibt, ob das Warnbild allein durch A oder auch durch Zeit weiterschaltet; die Aussage ist deshalb „Eingabe erreicht das Spiel, Zeiger wird dargestellt“, nicht „vollständig bedienbar“.
+
+Offen/Grenzen: keine Geschwindigkeits- oder FPS-Aussage (Boot bis Warnbild etwa 45 bis 60 s, Spiel läuft deutlich unter Echtzeit); nur Slot 0; Firefox/Safari/Windows ungeprüft; Ton nicht hörbar geprüft; im eingebetteten Browser-Pane der Claude-App starten die Pthread-Worker nicht, daher wird headless Chrome per CDP genutzt. `vite preview` liefert nach einem Neubau veraltete Dateien aus dem Speicher; den Vorschauserver nach `npm run build` neu starten.
+
+## Begrenzte Bildübergabe
+
+Der Worker überträgt höchstens ein Bild, während der Hauptthread es verarbeitet, und hält höchstens das jeweils neueste weitere Bild (`src/frame-mailbox.ts`). Der Hauptthread bestätigt nach `putImageData`; daraufhin wird das neueste wartende Bild gesendet. Beim Pausieren oder Stoppen wird ein wartendes Bild verworfen. So entsteht zwischen Worker und UI keine unbeschränkt lange Bildwarteschlange. `tests/frame-mailbox.test.ts` prüft 200 schnelle Bilder gegen eine langsame UI; der Browser-E2E-Test mit echtem Kern besteht weiterhin 13/13. Die sichtbare Wii-Play-Latenz wurde nach dieser Änderung noch nicht neu gemessen. Der Kernbericht `docs/performance-status.md` nennt etwa 3,3 neue Bildinhalte pro Sekunde am Titelbildschirm als separate Beobachtung.

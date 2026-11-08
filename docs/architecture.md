@@ -19,3 +19,21 @@ Serve HTTPS (localhost is suitable for development), application/wasm and COOP s
 Acceptance gates: reproducible toolchain → actual Wii homebrew CPU trace → actual rendered frame → input response → synchronized sound → measured performance and game compatibility. Browser shell tests do not prove emulation.
 
 Runtime owns lifecycle status events; adapters should emit frame/audio/log/metrics/error, not independently change wrapper states. Fatal asynchronous native errors are preserved even when a command promise resolves. Use stop to recover if the initialized core can unload safely; otherwise reload the page.
+
+## Implemented core integration
+
+Codex implements the JS adapter in `src/dolphin-adapter.ts`; the core agent owns native exports/build output. `public/core/adapter.js` is only the Vite development entry. The library build replaces it in `dist/core/adapter.js`. Import real artifacts with `npm run core:install -- <dist-core>`.
+
+`CoreInfo.capabilities` optionally reports `wiiInput`, `video`, and `audio`. The UI forwards input only if `wiiInput` is explicitly true. The first adapter supports small DOL/ELF files, interpreter CPU, Software renderer, and the AV frame bridge. It never calls `RunFrame` or emits metadata/FPS. Before each boot it records the native frame generation and forwards only a new positive generation. Native `SetInputState` is GC-pad-only in the pinned revision and is deliberately not bound to Wii input.
+
+Single-buffer copying is a prototype limitation: a frame counter incremented after decode cannot prove the writer was idle during a copy, even when the counter remains unchanged. Counter mismatch drops only detectable overlaps. Do not claim a tear-free snapshot until native synchronization/double buffering is implemented.
+
+## Wiimote agreement with core agent (a04af6e proposal)
+
+InputState gains optional `accel: {x,y,z}` in g units, default (0,0,1). Only the worker adapter calls native ccall, using the agreed 8-argument WiiOnline_SetWiimote export for slot 0. Pointer remains normalized top-left origin; visible=false disables IR. The first scope is eleven buttons plus IR, without extensions. Native agent uses Dolphin defaults for camera geometry and documents them. Input is supported only when both new Set/Clear exports exist; the old GameCube/metadata SetInputState is never used. Pause/focus loss sends a neutral active override; stop clears it. Native debug and full guest-read tests are separate gates, not proven by the adapter fixture.
+
+## RVZ file path and measured speed
+
+RVZ is advertised only when the module provides WORKERFS and mount/unmount APIs. The adapter checks the four-byte RVZ signature, then mounts the original File as /wiionline-disc/disc.rvz using WORKERFS blobs. It never calls the whole-file arrayBuffer() method for RVZ. The title must be stopped before unmount; stop unloads core readers, then removes the mount and directory. Homebrew retains the 64 MiB MEMFS limit; RVZ does not inherit that limit.
+
+Default CPU is Cached Interpreter, with the inherited PPC-to-WASM JIT enabled when exported. Software rendering is still the output backend. The previous performance display has been removed: VI/XFB publication counts and virtual timer progression are not validated measures of guest-rendered frames or real game speed. A correct measurement needs guest render/presentation evidence and an independent emulated-time check. Do not reintroduce FPS/speed labels based only on those counters. Font assets from the same Dolphin source revision are supplied with their upstream Apache notice, then loaded into /dolphin-sys/GC before CoreInit.

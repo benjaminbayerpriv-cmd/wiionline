@@ -1,13 +1,14 @@
 /** Shared browser/worker contract v1. Changes require coordination with both core agents. */
 export type EmulatorState = 'idle' | 'loading' | 'ready' | 'running' | 'paused' | 'error';
 export type Button = 'A' | 'B' | 'ONE' | 'TWO' | 'PLUS' | 'MINUS' | 'HOME' | 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
-export type InputState = { buttons: Button[]; pointer: { x: number; y: number; visible: boolean } };
+export type InputState = { buttons: Button[]; pointer: { x: number; y: number; visible: boolean }; accel?: { x: number; y: number; z: number } };
 export type Command =
-  | { type: 'init' }
+  | { type: 'init'; videoBackend?: 'software' | 'ogl' }
   | { type: 'load'; file: File }
   | { type: 'start' | 'pause' | 'stop' }
+  | { type: 'frame-ack' }
   | { type: 'input'; input: InputState };
-export type CoreInfo = { name: string; revision: string; formats: string[] };
+export type CoreInfo = { name: string; revision: string; formats: string[]; capabilities?: { wiiInput: boolean; video: boolean; audio: boolean } };
 export type CoreEvent =
   | { type: 'status'; state: EmulatorState; message: string; core?: CoreInfo }
   | { type: 'log'; message: string }
@@ -24,4 +25,5 @@ export interface EmulatorCore {
   stop(): Promise<void>;
   input(input: InputState): void;
 }
-export type CreateCore = (emit: (event: CoreEvent) => void) => Promise<EmulatorCore>;
+export type CoreCreateOptions = { videoBackend?: 'software' | 'ogl' };
+export type CreateCore = (emit: (event: CoreEvent) => void, options?: CoreCreateOptions) => Promise<EmulatorCore>;
