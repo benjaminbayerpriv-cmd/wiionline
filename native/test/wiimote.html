@@ -1,0 +1,2 @@
+<!doctype html><meta charset="utf-8"><title>wiimote test</title><pre id="o">läuft ...</pre>
+<script type="module">const w=new Worker("wiimote-worker.mjs",{type:"module"});w.onmessage=e=>{window.RESULT=e.data;document.title=e.data.pass?"PASS":"FAIL";document.getElementById("o").textContent=e.data.passed+"/"+e.data.total};w.onerror=e=>{window.RESULT={pass:false,error:String(e.message)};document.title="FAIL"};w.postMessage(1);</script>

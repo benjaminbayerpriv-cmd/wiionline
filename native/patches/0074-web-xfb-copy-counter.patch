@@ -1,0 +1,35 @@
+--- a/Source/Core/VideoCommon/TextureCacheBase.cpp
++++ b/Source/Core/VideoCommon/TextureCacheBase.cpp
+@@ -1,6 +1,8 @@
+ // Copyright 2010 Dolphin Emulator Project
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ 
++#include <atomic>
++
+ #include "VideoCommon/TextureCacheBase.h"
+ 
+ #include <algorithm>
+@@ -2124,6 +2126,14 @@
+   // colors are clamped to the range [0, 255], but if the sum is higher than 128, that clamping
+   // breaks (as colors end up >= 512, which wraps back to 0).
+   return coefficients[0] + coefficients[1] + coefficients[2] >= 128;
++}
++
++// wiionline (Patch 0074): Zaehler echter EFB->XFB-Kopien; der OGL-Readback (Emscripten.cpp) wird
++// uebersprungen, solange sich seit dem letzten Readback keine neue XFB-Kopie ereignet hat.
++std::atomic<unsigned> g_web_xfb_copy_count{0};
++extern "C" unsigned DolphinWeb_XfbCopyCount()
++{
++  return g_web_xfb_copy_count.load(std::memory_order_relaxed);
+ }
+ 
+ void TextureCacheBase::CopyRenderTargetToTexture(
+@@ -2191,6 +2201,8 @@
+   // Disadvantage of all methods: Calling this function requires the GPU to perform a pipeline flush
+   // which stalls any further CPU processing.
+   const bool is_xfb_copy = !is_depth_copy && !isIntensity && dstFormat == EFBCopyFormat::XFB;
++  if (is_xfb_copy)
++    g_web_xfb_copy_count.fetch_add(1, std::memory_order_relaxed);
+   bool copy_to_vram = g_backend_info.bSupportsCopyToVram && !g_ActiveConfig.bDisableCopyToVRAM;
+   bool copy_to_ram =
+       !(is_xfb_copy ? g_ActiveConfig.bSkipXFBCopyToRam : g_ActiveConfig.bSkipEFBCopyToRam) ||

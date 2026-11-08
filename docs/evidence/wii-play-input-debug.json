@@ -1,0 +1,142 @@
+{
+ "note": "Wii Play EU RVZ, Chrome 157 headless, Software Renderer, Cached+WASM-JIT, Zweikern; WiiOnline_SetWiimote(0, A) bei 15/24/34/44 s Wand fuer je 0,5 s; Debug-Puffer slot 0; nur Zustandswechsel",
+ "core_wasm_sha256": "42f67e40dc895f8f89099ef6ba469f325334a4c3e6dcf3a18fcc99162772c0a1",
+ "events": [
+  {
+   "wall_s": 0.02,
+   "guest_s": 0,
+   "generation": 0,
+   "build_count": 0,
+   "last_hex": 0,
+   "web_mask": 0
+  },
+  {
+   "wall_s": 15.02,
+   "guest_s": 11.54,
+   "generation": 1,
+   "build_count": 0,
+   "last_hex": 0,
+   "web_mask": 1
+  },
+  {
+   "wall_s": 15.27,
+   "guest_s": 11.79,
+   "generation": 1,
+   "build_count": 47,
+   "last_hex": 2048,
+   "web_mask": 1
+  },
+  {
+   "wall_s": 15.53,
+   "guest_s": 12.04,
+   "generation": 2,
+   "build_count": 93,
+   "last_hex": 2048,
+   "web_mask": 0
+  },
+  {
+   "wall_s": 15.78,
+   "guest_s": 12.28,
+   "generation": 2,
+   "build_count": 138,
+   "last_hex": 0,
+   "web_mask": 0
+  },
+  {
+   "wall_s": 24.15,
+   "guest_s": 20.65,
+   "generation": 3,
+   "build_count": 1708,
+   "last_hex": 0,
+   "web_mask": 1
+  },
+  {
+   "wall_s": 24.4,
+   "guest_s": 20.9,
+   "generation": 3,
+   "build_count": 1756,
+   "last_hex": 2048,
+   "web_mask": 1
+  },
+  {
+   "wall_s": 24.66,
+   "guest_s": 21.2,
+   "generation": 4,
+   "build_count": 1811,
+   "last_hex": 2048,
+   "web_mask": 0
+  },
+  {
+   "wall_s": 24.92,
+   "guest_s": 21.44,
+   "generation": 4,
+   "build_count": 1857,
+   "last_hex": 0,
+   "web_mask": 0
+  },
+  {
+   "wall_s": 34.05,
+   "guest_s": 30.46,
+   "generation": 5,
+   "build_count": 3548,
+   "last_hex": 0,
+   "web_mask": 1
+  },
+  {
+   "wall_s": 34.31,
+   "guest_s": 30.73,
+   "generation": 5,
+   "build_count": 3599,
+   "last_hex": 2048,
+   "web_mask": 1
+  },
+  {
+   "wall_s": 34.56,
+   "guest_s": 30.99,
+   "generation": 6,
+   "build_count": 3647,
+   "last_hex": 2048,
+   "web_mask": 0
+  },
+  {
+   "wall_s": 34.82,
+   "guest_s": 31.24,
+   "generation": 6,
+   "build_count": 3693,
+   "last_hex": 0,
+   "web_mask": 0
+  },
+  {
+   "wall_s": 44.19,
+   "guest_s": 40.6,
+   "generation": 7,
+   "build_count": 5450,
+   "last_hex": 0,
+   "web_mask": 1
+  },
+  {
+   "wall_s": 44.45,
+   "guest_s": 40.85,
+   "generation": 7,
+   "build_count": 5496,
+   "last_hex": 2048,
+   "web_mask": 1
+  },
+  {
+   "wall_s": 44.7,
+   "guest_s": 41.11,
+   "generation": 8,
+   "build_count": 5545,
+   "last_hex": 2048,
+   "web_mask": 0
+  },
+  {
+   "wall_s": 44.96,
+   "guest_s": 41.35,
+   "generation": 8,
+   "build_count": 5591,
+   "last_hex": 0,
+   "web_mask": 0
+  }
+ ]
+}

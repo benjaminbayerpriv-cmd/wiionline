@@ -1,0 +1,38 @@
+--- a/Source/Core/Core/HW/ProcessorInterface.cpp
++++ b/Source/Core/Core/HW/ProcessorInterface.cpp
+@@ -3,6 +3,7 @@
+ 
+ #include "Core/HW/ProcessorInterface.h"
+ 
++#include <atomic>
+ #include <memory>
+ 
+ #include "Common/Assert.h"
+@@ -196,8 +197,18 @@
+   }
+ }
+ 
++// wiionline (Patch 0072): Zaehler gesetzter Interrupts je Ursache (Bit 0..14), nur Diagnose.
++std::atomic<u32> g_web_pi_irq_set[16];
++
+ void ProcessorInterfaceManager::SetInterrupt(u32 cause_mask, bool set)
+ {
++  if (set && cause_mask != 0 && (cause_mask & (cause_mask - 1)) == 0)
++  {
++    for (u32 b = 0; b < 16; ++b)
++      if (cause_mask == (1u << b))
++        g_web_pi_irq_set[b].fetch_add(1, std::memory_order_relaxed);
++  }
++
+   DEBUG_ASSERT_MSG(POWERPC, Core::IsCPUThread(), "SetInterrupt from wrong thread");
+ 
+   if (set && !(m_interrupt_cause & cause_mask))
+@@ -280,3 +291,8 @@
+ }
+ 
+ }  // namespace ProcessorInterface
++
++extern "C" unsigned DolphinWeb_PiIrqCount(int bit)
++{
++  return (bit >= 0 && bit < 16) ? ProcessorInterface::g_web_pi_irq_set[bit].load(std::memory_order_relaxed) : 0;
++}

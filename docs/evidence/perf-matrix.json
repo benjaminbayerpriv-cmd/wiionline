@@ -1,0 +1,82 @@
+{
+ "dual_default": {
+  "fastsw": 0,
+  "tevhot": 0,
+  "thread": 1,
+  "wall_s": 29.7,
+  "spielzeit_rate": 1.0,
+  "efb_xfb_pro_wandsekunde": 2.93,
+  "efb_xfb_pro_spielsekunde": 2.92,
+  "efb_xfb_kopie_ms": 16.3
+ },
+ "F0": {
+  "fastsw": 1,
+  "tevhot": 0,
+  "thread": 1,
+  "wall_s": 29.7,
+  "spielzeit_rate": 1.0,
+  "efb_xfb_pro_wandsekunde": 2.96,
+  "efb_xfb_pro_spielsekunde": 2.96,
+  "efb_xfb_kopie_ms": 16.2
+ },
+ "F1": {
+  "fastsw": 2,
+  "tevhot": 0,
+  "thread": 1,
+  "wall_s": 29.7,
+  "spielzeit_rate": 1.0,
+  "efb_xfb_pro_wandsekunde": 2.99,
+  "efb_xfb_pro_spielsekunde": 2.99,
+  "efb_xfb_kopie_ms": 15.0
+ },
+ "F2": {
+  "fastsw": 3,
+  "tevhot": 0,
+  "thread": 1,
+  "wall_s": 29.7,
+  "spielzeit_rate": 1.001,
+  "efb_xfb_pro_wandsekunde": 3.07,
+  "efb_xfb_pro_spielsekunde": 3.06,
+  "efb_xfb_kopie_ms": 14.9
+ },
+ "F3": {
+  "fastsw": 0,
+  "tevhot": 1,
+  "thread": 1,
+  "wall_s": 29.7,
+  "spielzeit_rate": 1.001,
+  "efb_xfb_pro_wandsekunde": 3.17,
+  "efb_xfb_pro_spielsekunde": 3.16,
+  "efb_xfb_kopie_ms": 14.9
+ },
+ "F4": {
+  "fastsw": 0,
+  "tevhot": 2,
+  "thread": 1,
+  "wall_s": 29.7,
+  "spielzeit_rate": 1.002,
+  "efb_xfb_pro_wandsekunde": 3.09,
+  "efb_xfb_pro_spielsekunde": 3.09,
+  "efb_xfb_kopie_ms": 15.0
+ },
+ "F5": {
+  "fastsw": 0,
+  "tevhot": 3,
+  "thread": 1,
+  "wall_s": 29.9,
+  "spielzeit_rate": 0.999,
+  "efb_xfb_pro_wandsekunde": 3.08,
+  "efb_xfb_pro_spielsekunde": 3.08,
+  "efb_xfb_kopie_ms": 14.9
+ },
+ "single_core": {
+  "fastsw": 0,
+  "tevhot": 0,
+  "thread": 0,
+  "wall_s": 20.1,
+  "spielzeit_rate": 0.062,
+  "efb_xfb_pro_wandsekunde": 3.74,
+  "efb_xfb_pro_spielsekunde": 59.94,
+  "efb_xfb_kopie_ms": 14.6
+ }
+}

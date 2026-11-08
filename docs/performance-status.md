@@ -1,0 +1,144 @@
+# Performance-Status Wii Play (Kern-Zweig)
+
+Stand: 2026-11-08. Alle Zahlen sind gemessen; Reproduktion: `native/perf/` (`probe.mjs` Node, `serve-perf.mjs` + `run-browser.mjs` + `probe-worker.mjs` headless Chrome 157 per CDP, `summarize.py`, `shots.py`). Kern: Dolphin e22551e; die ersten Messungen nutzten die Artefakte aus `docs/core-status.md`, die neue Instrumentierung den unten genannten Build. Disc: lokale Wii-Play-RVZ (nicht im Repo).
+
+## Begriffe (bewusst getrennt)
+- **Spielzeit-Rate**: Gast-Ticks (CoreTiming, Taktrate je Sample neu gelesen, Wii = 729 MHz) pro Wandzeit. Erste Messung las 486 MHz (zu früh, vor Wii-Init) und zeigte fälschlich 1,5.
+- **VI-/XFB-Ausgaben**: `GetFrame`-Generation, ~60/s; zählt auch wiederholte Scanouts desselben Bilds.
+- **Neue Bilder**: Vollinhalts-Hash des `FrameBuffer` (320×228 RGBA) ändert sich. Nur das ist „neues Bild“.
+
+## Messwerte
+| Messung | Ergebnis |
+|---|---|
+| Node 22, Software Renderer, Cached+WASM-JIT, Throttle an (Sicherheitsbild) | Spielzeit 1,00, 59,9 VI/s |
+| dito ohne Throttle (Kapazität, Leerlauf-Bildschirm) | 3,5× (Node), 7,1× (Chrome headless) |
+| dito Cached ohne JIT | 3,0× (JIT bringt ~15 %) |
+| Interpreter | 0,04× (unbrauchbar) |
+| Einkern (`SetCpuThread(0)`), ohne Throttle | 0,12× (unbrauchbar) |
+| Chrome 157 headless, Sicherheitsbild → Titel → Spielerwahl → Mii-Auswahl (Wiimote per Skript), Throttle an | durchgehend Spielzeit 1,00 (kurze Dips 0,70–0,85 beim JIT-Warmlaufen, 0,98 bei 4000+ JIT-Übersetzungen) |
+| Audio entmutet, nichts holt PCM ab | keine Änderung (1,00) |
+| **Titelbildschirm: neue Bilder** (Chrome headless, ohne die Webseite, Vollinhalts-Hash) | **~3,3 neue Bilder/s, Abstand median 303 ms**, obwohl ~50 Ausgaben/s ankommen |
+| Echte Seite in Chrome 157 (sichtbar), Titel/Übergang | ~24 Canvas-Updates/s vor dem Adapter-Fix, danach ~45–49/s; neue Inhalte ~3,3/s (wie im Kern) |
+
+Der Nutzer sah „~5 fps mit ~2 s Verzögerung“. Das passt zu ~3,3 neuen Bildern/s.
+
+## Was gesichert ist
+1. Die Spielzeit läuft (nach Ticks und VI) mit 100 %, auch in Menüs; trotzdem erzeugt das Spiel am Titelbildschirm im Kern nur ~3,3 verschiedene Bilder pro Sekunde. „100 % Spielzeit“ ist also **keine** Aussage über flüssige Anzeige.
+2. Das reproduziert sich ohne die Webseite (eigener Messaufbau) und liegt daher im Kern/Spiel, nicht in der Seite.
+3. Die Seite verschärfte es: Bildabholung hing am schweren Pump-Takt (~24 statt ~50 Abholungen/s). Fix im Web-Zweig (`claude/web-integration`, d15f9d4): eigener 4-ms-Timer nur für Bilder. Das behebt nur die Abholung, nicht die niedrige Zahl neuer Bilder.
+4. Geerbte Throttle-Änderungen: `SleepUntil` schläft (Busy-Spin wurde im Altpatch zurückgenommen); `Config`: Emulationsgeschwindigkeit 1,0, Overclock-Schalter an (Faktor 1,0), `RUSH_FRAME_PRESENTATION` an. Keine Auffälligkeit; das Pacing hält 59,9 VI/s.
+
+## Nachtrag 2026-11-08: Ursache eingegrenzt (Messbelege `docs/evidence/perf-matrix.json`)
+Profil des Kerns (`SetSoftwareRasterProfileEnabled(1)`, `GetVideoStats`: `xfbgen` = EFB→XFB-Kopien, `rast`, `tev`, `tex`):
+1. **Tatsächliche EFB→XFB-Kopien** (`xfbgen`), keine Scanouts: Titelbildschirm, Zweikern (Standard der Seite): **~3,0 Kopien pro Wandsekunde** bei 59,9 VI-Ausgaben/s. Kopien können gleichen Bildinhalt enthalten; Änderungen werden separat per Vollbild-Hash geprüft. Die Kopie selbst kostet ~15 ms und ist nicht der Engpass.
+2. **Einkern-Gegenprobe** (`SetCpuThread(0)`, Throttle an): Spielzeit-Rate nur 0,06, aber **59,94 EFB→XFB-Kopien pro Spielsekunde** (3,7 pro Wandsekunde). Das Spiel stößt in Gastzeit also Kopien mit ~60/s an; es wird **nicht** durch einen Gast-Takt (Wiimote/BT) auf ~3 Kopien pro Spielsekunde begrenzt. Eine Kopie liegt etwa 270 ms Wandzeit nach der vorigen.
+3. **Software-Rasterizer dominiert**: ~34 000 Rasteraufrufe in 85 s, im Mittel ~1,6 ms (gesampelt 1:64) → ~56 s von ~60 aktiven Sekunden; ~349 Mio TEV- und ~356 Mio Textur-Pixelaufrufe, ~1,15 Mio Pixel/Spielbild (viel Überzeichnung). Das passt zu ~3,3 gerenderten Bildern/s. (Die Zeitschätzung beruht auf Stichproben und ist ungefähr.)
+4. **Zweikernmodus**: Die Gastzeit läuft weiter, während der Software-GPU-Thread nur ~3 XFB-Kopien/s abschließt; die Anzeige zeigt entsprechend selten neue Inhalte, und die Eingabe wirkt erst mit dem GPU-Rückstand. Das erklärt „~5 fps mit ~2 s Verzögerung“ qualitativ; die Verzögerung selbst ist nicht direkt gemessen.
+5. **Die geerbten Schnellmodi helfen nicht**: `SetFastSoftwareRaster` 1/2/3 → 2,96/2,99/3,07 Kopien/s; `SetSoftwareTevHotCaseMode` 1/2/3 → 3,17/3,09/3,08; Standard ~2,9–3,0. Unterschiede liegen im Rauschen.
+6. Throttle/Timing-Hacks (`SleepUntil` schläft, Emulationsgeschwindigkeit 1,0, Overclock 1,0) sind unauffällig: 59,9 VI/s, Spielzeit 1,00.
+
+**Folgerung:** Der Software-Rasterizer (SW-Backend in WASM, ein Thread) schafft bei Wii Play in dieser Phase ~3 EFB→XFB-Kopien/s. Das ist ein Durchsatzproblem der Pixel-Pipeline (TEV + Textur), kein Pacing- und kein Seitenproblem. Wege (nicht umgesetzt, nicht getestet): (a) Hardware-Renderer (WebGL2/WebGPU) statt Software; im Patchsatz gibt es einen OGL/WebGL2-Pfad, dessen Zustand ungeprüft ist (Grafik-Zweig); (b) Rasterisierung auf mehrere Pthreads aufteilen; (c) Pixel-Pipeline optimieren (SIMD). Einen belegten, sicheren Kern-Fix gibt es nicht; kein Standardwert wurde geändert.
+
+## Offen / ungeklärt
+- Ursache der seltenen Kopien für diesen Software-Renderer-Pfad eingegrenzt (siehe Nachtrag und kontrolliertes Gastzeitfenster). Übertaktung 3× lieferte zuvor kein verwertbares Ergebnis; die Gastzeit-Gegenprobe ohne Throttle ist inzwischen ausgeführt. Das Verhalten anderer Renderer und echter Minispiele bleibt offen.
+- Kein Minispiel erreicht: Skript-Eingaben kamen bis zur Mii-Auswahl, Spielmenü/Minispiel nicht. Last in echten Spielphasen ungemessen.
+- Alle Browser-Zahlen: headless Chrome 157 bzw. ein sichtbarer Lauf; kein Firefox/Safari; ein Rechner (Apple Silicon, 10 Kerne).
+- Kein belegter Kern-Fix. Behauptung „Spiel läuft flüssig“ ist **nicht** zulässig.
+
+## Instrumentierung vom 08.11.2026 (Commit 3aff0e5)
+
+Der vorhandene Software-Kopierpfad `SWEfbInterface::EncodeXFB` meldet nach abgeschlossener RAM-Kopie bereits `xfbgen` im aktivierten Rasterprofil. Das ist ein Ereignis an der tatsächlichen EFB→XFB-Kopie, nicht am VI-Scanout. Neu zählt `SWVertexLoader::DrawCurrentBatch` die tatsächlich an den Software-Renderer übergebenen GX-Batches (`drawbatch`). Beide Zähler sind kumulativ und werden mit `SetSoftwareRasterProfileEnabled(1)` eingeschaltet. Ein Node-Boot mit dem neuen WASM-Build erreichte 27 XFB-Kopien und 244 Draw-Batches; dieser kurze Lauf diente nur der Funktionsprüfung unter paralleler Rechnerlast.
+
+Build: `scripts/core-build.sh patch && scripts/core-build.sh configure && JOBS=8 scripts/core-build.sh build` im Kern-Checkout, Dolphin e22551e; SHA-256 des erzeugten WASM: `42f67e40dc895f8f89099ef6ba469f325334a4c3e6dcf3a18fcc99162772c0a1`. Disc bleibt lokal und wird nicht eingecheckt. Rohdaten liegen unter `native/perf/data/`.
+
+Vorläufige Läufe mit dem vorherigen Build (Profil aktiv, ohne neuen Batch-Zähler): Im Sicherheitsbild wurden über 24,71 s Wandzeit 24,72 s Gastzeit, 1481 VI-/XFB-Ausgaben und 136 echte XFB-Kopien gemessen. Mit der geskripteten Folge A bei 12, 24 und 36 s waren es im Fenster 25–60 s über 34,78 s Wandzeit 34,62 s Gastzeit, 2076 VI-/XFB-Ausgaben und 120 Kopien. Die Vollbild-Hash-Abstände geänderter Ausgaben hatten dort einen Median von 304,6 ms. `rast` aus dem älteren Profil ist nicht monoton und wird nicht als Draw-Rate interpretiert. Die Rohdateien heißen `baseline-old-title.json` und `old-input-sequence.json`.
+
+Für den kontrollierten Throttle-Vergleich nutzt `probe-worker.mjs` Gastsekunden (`g`) für Eingabeereignisse und hält das Auswertefenster in Gastzeit konstant; `summarize.py` meldet Ereignisse pro Wand- und Gastsekunde getrennt. Eine niedrigere Zahl geänderter Ausgaben ist kein FPS-Nachweis für eine ganze Spielphase.
+
+### Kontrolliertes Fenster 25–55 Gastsekunden
+
+Chrome 157 headless, Software-Renderer, Zweikern, A-Eingaben bei Gastsekunde 12–13, 24–25 und 36–37, Rasterprofil aktiv, keine Bild-Hashes während der Vergleichsläufe. Rohdateien unter `native/perf/data/core-*.json`. Alle Zahlen sind **Ereignisse**, nicht FPS.
+
+| Einstellung | Gastzeit/Wandzeit | VI-Ausgaben/Gast-s | EFB→XFB-Kopien/Gast-s | SW-Draw-Batches/Gast-s | JIT-Blöcke/Gast-s |
+|---|---:|---:|---:|---:|---:|
+| Throttle 1, WASM-JIT an | 0,997 | 59,95 | 3,37 | 189,84 | 4,00 Mio. |
+| Throttle 0, WASM-JIT an | 5,921 | 59,96 | 1,15 | 10,33 | 3,24 Mio. |
+| Throttle 1, WASM-JIT aus | 0,997 | 59,94 | 4,00 | 241,40 | 0 |
+
+Eingabeereignisse wurden tatsächlich bei 12,01/13,02/24,06/25,01/36,05/37,02 Gastsekunden (Throttle an) und 12,01/13,09/24,07/25,28/36,11/37,05 (Throttle aus) ausgelöst; die leichte Abweichung folgt dem 50-ms-Polling. Ohne Throttle läuft der Gast schneller, aber die Zahl fertiggestellter Kopien und Draw-Batches pro Gastsekunde sinkt stark. Die CPU ist also nicht durch den VI-Takt blockiert; der Software-GPU-Pfad fällt gegenüber der Gastzeit zurück. Der Vergleich beweist keine exakte Eingabelatenz und keine Bildrate eines Minispiels. Dass ohne WASM-JIT weiterhin ~4 Kopien pro Gastsekunde entstehen, schließt laufende WASM-JIT-Blöcke als notwendige Ursache aus.
+
+Ein zusätzlicher 30-Gastsekunden-Lauf mit `SetPpcProfileEnabled(1)` zählte am VI/SI-Throttle-Punkt 122 Aufrufe, davon 68 langsame, mit insgesamt 2,98 s Wartezeit und 47,5 ms Maximum. Diese Profilzahlen gelten für den ganzen Lauf und werden wegen des zusätzlichen Profil-Overheads nicht direkt mit der obigen Fenster-Tabelle verrechnet. `rast` aus dem älteren Profil ist innerhalb dieser Läufe nicht monoton; daraus wird keine Draw-Rate berechnet. Der neue `drawbatch`-Zähler blieb monoton.
+
+Reproduktion nach dem Build: `node native/perf/serve-perf.mjs 8124 dist-core /absoluter/pfad/zur/lokalen/Wii-Play.rvz` starten; anschließend `node native/perf/run-browser.mjs '<JSON-Konfiguration>' > messung.json` und `python3 native/perf/summarize.py < messung.json`. Die exakten JSON-Konfigurationen einschließlich Gastzeitfenster und Eingaben stehen in `cfg` jeder Rohdatei. Die Disc wird weder kopiert noch committet.
+
+## Abschluss der FastSW/TEV-Messreihe (2026-11-08)
+
+Die Reihe ist beendet; es läuft keine Messung oder Build mehr. Keine weiteren Läufe sind gestartet.
+
+**Aufbau (reproduzierbar).** Chrome 157 headless per CDP, Dolphin e22551e, WASM-SHA-256 `42f67e40…c0a1` (Build siehe oben), Software Renderer, Cached + WASM-JIT, Zweikern (`thread 1`), Throttle an, Rasterprofil an, Audio stumm, 85 s Lauf, davon 30 s Aufwärmen, A-Taste bei 12/20/30/40 Gastsekunden. Die exakten Konfigurationen stehen unter `native/perf/data/matrix-cfg/` (`f0`–`f5`: `fastsw` 1/2/3 und `tevhot` 1/2/3 einzeln; `p1` = Standard Zweikern; `t0` = Einkern). Ausführung: `native/perf/run-matrix.sh` (liest dort `/tmp/perf/f<i>cfg.json`, Kopie der Dateien dorthin legen) bzw. `node native/perf/run-browser.mjs "$(cat <cfg>)"`. Ausgewertet in `docs/evidence/perf-matrix.json` (30-s-Fenster; Zuordnung der Zeilen `dual_default`/`single_core` zu `p1`/`t0` nach Parametern, nicht über gespeicherte Labels). Die Rohdateien der Läufe `f0`–`f5` liegen nur in `/tmp/perf` und sind nicht eingecheckt (zu groß, ca. 8 MB je Lauf mit Hashes); eingecheckt sind Konfiguration und Auswertung.
+
+**Ergebnis (je ein Lauf, Titelbildschirm, EFB→XFB-Kopien):**
+
+| Modus | Kopien/Wandsek. | Spielzeit-Rate |
+|---|---:|---:|
+| Standard | 2,93 | 1,00 |
+| `fastsw` 1 / 2 / 3 | 2,96 / 2,99 / 3,07 | 1,00 |
+| `tevhot` 1 / 2 / 3 | 3,17 / 3,09 / 3,08 | 1,00 |
+| Einkern (Gegenprobe) | 3,74 (= 59,94 pro Spielsek., Spielzeit 0,06) | 0,06 |
+
+Spannweite aller Zweikern-Modi 2,93–3,17 (±4 % um den Mittelwert). Mit n = 1 je Modus ist das nicht von Rauschen zu unterscheiden; **kein Modus beschleunigt messbar**. Die Kopie selbst dauert ~15 ms und ist nicht der Engpass.
+
+**Engpass (belegt):** Der Software-Rasterizer (Draw-Batches mit TEV/Textur) liefert auf einem Thread ~3 abgeschlossene EFB→XFB-Kopien pro Wandsekunde, während das Spiel in Gastzeit ~60 Kopien/s anstößt (Einkern-Gegenprobe). Pacing, Wiimote und Seite sind ausgeschlossen (siehe oben).
+
+**Grenzen der Aussagen:**
+- Nur Titelbildschirm/Menü bis Mii-Auswahl; kein Minispiel, andere Szenen können schwerer oder leichter sein.
+- Ein Rechner (Apple Silicon, 10 Kerne), nur headless Chrome 157; kein Firefox/Safari; je Modus ein Lauf, keine Streuung.
+- Die Rasterzeit beruht auf 1:64-Stichproben; Eingabelatenz (~2 s) ist nicht direkt gemessen.
+- Fenster/Auswertung: die Wandzeiten der Tabelle (29,7 s bzw. 20,1 s) sind Auswertefenster, nicht die Lauflänge.
+
+### Getrennt: Ist ein Kern-Fix durch Daten belegt?
+**Nein.** Belegt ist nur, was nicht hilft: die vorhandenen Schnellmodi (`SetFastSoftwareRaster`, `SetSoftwareTevHotCaseMode`), das Abschalten des WASM-JIT (4,00 statt 3,37 Kopien/Gastsek., also JIT nicht ursächlich) und das Entfernen des Throttles (weniger Kopien pro Gastsekunde). Kein Standardwert wurde geändert, kein Kernpatch dafür geschrieben.
+
+**Nächste Messung (nicht gestartet):** OGL/WebGL2-Versuch laut `docs/ogl-feasibility.md` in sichtbarem Chrome mit echter GPU (`dolphinOglReadbackPresent`, `SetVideoBackend('OGL')`), Erfolg ≥ 20 verschiedene Bilder/s bei Spielzeit ≥ 0,9; danach, falls verworfen, Profilierung des Rasterizers pro Pixel (TEV/Textur) als Grundlage für Mehrthread/SIMD.
+
+**Blocker:** OGL-Pfad im Kern ungeprüft (Melee-Vorlauf nur ~1,3 Bilder/s mit Readback); headless Chrome nutzt SwiftShader und taugt nicht für OGL-Zahlen; ein echter Minispiel-Test braucht einen funktionierenden Eingabe-Pfad über die Mii-Auswahl hinaus; Mehrthread-Rasterizer erfordert Eingriffe an Kernquellen und neuen Build (nicht beauftragt).
+
+## OGL-„Stillstand“ (2026-11-08): Befund, kein Hänger
+
+**Kernaussage:** Der Gast bleibt in OGL nicht stehen; er reagiert auf A erst nach ~100 s statt nach ~35 s, weil das Spiel in OGL nur ~3 statt ~18 Frames/s abgibt. Die Warnseite nimmt A erst nach einer Zahl von Spiel-Frames an (Hypothese, passend zu den Daten).
+
+Belege (Chrome 157 headless/SwiftShader, Wii Play EU, Cached+WASM-JIT, Zweikern, gleiche Eingabe; Software-Renderer als Gegenprobe):
+- Gleiche Eingabe in Software: Bildwechsel sofort nach A, danach Disc-Lesen (22 702 196 B). OGL, 25 Drücke bis 75 s: nichts. OGL, Lauf bis 190 s, Drücke alle 4 s: neue Bilder ab ~79 s, Disc-Lesen ab ~100 s (dieselben 22 702 196 B). Eingabe kommt also an.
+- Eingabeweg identisch: `WiiOnline_GetWiimoteLink` (Patch 0071): Berichte an die BT-HLE, Modus 0x37, gleiche Zahlen in OGL und Software.
+- Interrupt-Ströme identisch (DSP ~1130/s, VI ~73/s, IPC ~850/s, Patch 0072); nur `PE_TOKEN/FINISH`: OGL ~3,2/s, Software ~18,6/s im Standbild. `PE_FINISH`-Aufrufe = ausgelöste Interrupts (183/183): nichts geht verloren (Patch 0070).
+- `emscripten_webgl_commit_frame`/Present: `commit:0` (Direkt-JS-Kontext, absichtlich), `glerr:0`; die frühere Erklärung „Present bricht ab, PE_FINISH bleibt aus“ trifft hier **nicht** zu.
+- Gast-RAM-Kopien (`dolphinOglXfbCopyToRam`, `dolphinOglEfbCopyToRam`) ändern nichts.
+- **GPU-Thread ist ausgelastet:** In `GLContextEmscripten::Swap` entfallen ~85 % der Wandzeit auf den Readback (`glReadPixels`), im Mittel ~9–16 ms bei ~57 Swaps/s, Spitzen bis 1,3 s (Patch 0073). Das Spiel wartet auf den GPU-Thread (Draw-Done), daher ~3 Frames/s. Die ~57 Swaps/s sind überwiegend VI-Wiederholungen; neue Inhalte (echte EFB→XFB-Kopien) nur ~0,8/s im Standbild (Patch 0074).
+
+**Grenzen/ungeklärt:** Messung nur headless mit Software-GL (SwiftShader); `glReadPixels` wartet dort auch auf die GL-Arbeit. Ein Lauf auf echter GPU (Apple M1 Pro, ANGLE/Metal) zeigte dieselbe Größenordnung (Readback ~9 ms/Swap, ~3 Frames/s), wurde aber abgebrochen, bevor die geänderte Readback-Logik ausgewertet war. Die Maßnahme „Readback nur bei neuer XFB-Kopie“ (Patch 0073 + `dolphinOglReadbackEverySwap` für das alte Verhalten) ist gebaut, ihre Wirkung ist **nicht belegt**. Ein Kern-Fix ist damit nicht nachgewiesen. Artefakt: `dolphin-core-upstream.wasm` SHA-256 `868d6c69…82fe` (Dolphin e22551e + Patches 0001–0074). Reproduktion: `scripts/core-build.sh build`, `native/perf/serve-perf.mjs` + `run-browser.mjs` mit `coreOpts` `{dolphinOglReadbackPresent,dolphinOglWorkerWebGl}`, `offscreenCanvas [640,528]`.
+
+### Nachtrag OGL (2026-11-08, später): wo die Zeit wirklich bleibt
+
+Chrome 157 headless mit **echter GPU** (`ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro)`, im Ergebnis als `glRenderer`), Wii Play, OGL mit beiden Flags, Zweikern. Instrumentierung: Patches 0070–0075 (siehe `native/patches/`).
+- **Doppelte Presents:** Der Kern erzwingt bei OGL ein Present je VI (~57/s), obwohl nur ~1 neue Spiel-Frame/s ankommt (`VideoConfig.cpp`, Altpatch). Mit `dolphinOglSkipDuplicateXFB:true` (Patch 0075, Standard unverändert) verdoppeln sich die Spiel-Frames (`PE_FINISH` 120 statt 56 nach 40 s), Swaps sinken auf ~1,5/s. Das allein hebt die Rate nicht auf 60.
+- **Readback blockiert ~1 s je Aufruf, unabhängig von Größe und Datenmenge:** Die erste `readPixels`-Operation nach einem gezeichneten Frame dauert ~0,9–1,0 s bei 320×264, 640×528 und 1280×1056 gleichermaßen; ein zweites Lesen direkt danach ~0,7 ms, ein 64×64-Lesen ~0,1 ms. Lesen in einen nicht geteilten Puffer + Kopie, `commit()`, `finish()`, `flush()` und „Standard-Framebuffer → Textur kopieren → FBO lesen“ ändern die ~1 s nicht. Asynchrones Lesen über PBO + Fence funktioniert hier nicht: im GPU-Pthread läuft keine Event-Schleife, `clientWaitSync(…, 0)` meldet nie „signalisiert“ (Test: es kamen keine Bilder an, deshalb nicht übernommen).
+- **WebGL-Aufrufe sind unauffällig:** nach dem Start nur ~16 Draws/s, 14 `linkProgram`/17 `compileShader` insgesamt, 8 `texSubImage2D`, keine Zeit in Aufrufen messbar (Aufruf-Wrapper im Worker). Die Wartezeit liegt damit nicht in der Aufrufmenge, sondern in der Ausführung bzw. Planung im Browser-GPU-Prozess.
+- Hypothese (ungeprüft): Pipeline-/Shader-Variantenbau im ANGLE/Metal-Treiber bzw. eine Planungs-/Präsentationsbremse für Worker-OffscreenCanvas; Entscheidung braucht Chrome-Tracing (`chrome://tracing`/GPU-Prozess) oder einen Test mit weniger Zustandswechseln.
+- **Ergebnis:** Ein belegter Kern-Fix für die geringe Bildrate in OGL liegt **nicht** vor. Belegt ist: (1) OGL „hängt“ nicht, sondern gibt ~1,4 Frames/s ab; (2) das Warten der Seite auf A erklärt sich damit; (3) 85–90 % der GPU-Thread-Zeit stehen im ersten Lesen nach dem Zeichnen; (4) doppelte Presents sind ein vermeidbarer Zusatz.
+- **Nächste Messung:** Chrome-Trace des GPU-Prozesses während eines OGL-Laufs (Zeit pro `readPixels`/ANGLE-Metal-Befehlsbuffer) oder Gegenprobe ohne Ubershader (`GFX_SHADER_COMPILATION_MODE`), jeweils auf echter GPU und ohne dass dabei ein Video in demselben Chrome läuft.
+- Artefakt für diese Messungen: `dolphin-core-upstream.wasm` SHA-256 siehe `dist-core/SHA256SUMS` nach `scripts/core-build.sh build`; ein sauberer Komplettbau aus leerem Verzeichnis wurde **nicht** wiederholt, die neuen Patches sind nur gegen den vorhandenen Arbeitsbaum geprüft. Ohne Diagnose-Flags verhält sich der Kern wie zuvor (Readback bleibt synchron, Standard-Flags unverändert), außer dass Swap jetzt bei unverändertem Bild alle 30 Swaps statt jedes Mal liest (Patch 0073) und Diagnosezähler laufen.
+
+### Auflösung (2026-11-08, Abend): die Bremse ist ANGLE/Metal in Chrome 157
+
+Gleicher Kern (SHA-256 siehe `dist-core/SHA256SUMS`), gleiche Konfiguration (OGL, `dolphinOglReadbackPresent`+`dolphinOglWorkerWebGl`, Standard-Presents), Chrome 157 headless, Wii Play, nur das ANGLE-Backend per Kommandozeile gewechselt (`CHROME_ARGS` in `native/perf/run-browser.mjs`):
+
+| ANGLE-Backend | erstes Lesen je Readback | Readbacks in 20 s | `PE_FINISH` nach 20 s (≈ Spiel-Frames) |
+|---|---:|---:|---:|
+| Metal (Standard, Apple M1 Pro) | ~0,9–1,0 s | 16 | 52 (≈ 2,6/s) |
+| SwiftShader (`--use-angle=swiftshader --enable-unsafe-swiftshader`) | ~10 ms | 286 | 924 (≈ 46/s) |
+
+Mit SwiftShader-ANGLE läuft OGL funktional: 393 verschiedene Bilder in 45 s (~14/s im Mittel, 11–16/s in der Spielphase), A bei 15 s löst das Disc-Lesen bis 20 s aus (`22 702 196` Bytes), Spielzeit ~1,0. Das Ergebnis hängt also **nicht** am Kern oder am Spiel, sondern am Browser-Grafikpfad: Der GPU-Prozess (Chrome-Trace, `native/perf/trace-run.mjs`) ist unter Metal zu ~90 % mit der Ausführung der Worker-WebGL-Befehle beschäftigt (95 Flushes, im Mittel ~80 ms, Spitzen 0,5–0,7 s), obwohl die Aufrufmenge winzig ist (~12 Draws/s, ~40 `bufferSubData`/s, ~1,4 MB gesamt). `sample` auf den GPU-Prozess zeigt CPU-Arbeit in Chrome-Code (nicht Warten) mit viel `memmove`. Früher als „SwiftShader/headless“ gelabelte OGL-Messungen waren in Wirklichkeit Metal (die Variante `glRenderer` im Ergebnis zeigt es jetzt an).
+
+- **Belegt:** (1) OGL im Kern funktioniert; (2) die ~1-s-Wartezeit je Readback entsteht im Browser-GPU-Prozess unter ANGLE/Metal für diese Last; (3) dieselbe Last ist mit ANGLE/SwiftShader ~18-mal schneller.
+- **Nicht belegt:** welche GL-Eigenschaft Metal ausbremst (Vermutungen: Vertex-Attribut-Konvertierung, Zustandsvarianten/PSO-Bau, Puffer-Umbenennung); ob andere Chrome-Versionen/Rechner betroffen sind; ob `chrome://flags` → „Choose ANGLE graphics backend“ die SwiftShader-Option anbietet (nur die Kommandozeile getestet). SwiftShader ist Software-GL und belastet die CPU (neben den Emulator-Threads); eine Dauerlösung ist das nicht.
+- **Nächste Schritte:** (a) mit einer kleinen eigenständigen WebGL2-Seite oder durch gezieltes Abschalten einzelner Dolphin-GL-Zustände (z. B. Vertex-Formate, Blend/ColorMask-Wechsel) das Metal-Auslöser-Merkmal eingrenzen und dann im Kern vermeiden; (b) andere Chrome-/Safari-/Firefox-Versionen messen; (c) bis dahin für Tests SwiftShader-ANGLE nutzen.

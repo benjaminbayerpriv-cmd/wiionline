@@ -1,0 +1,61 @@
+--- a/Source/Core/Core/HW/WiimoteEmu/WiimoteEmu.cpp
++++ b/Source/Core/Core/HW/WiimoteEmu/WiimoteEmu.cpp
+@@ -9,6 +9,7 @@
+ #include <cstdint>
+ #include <fstream>
+ #include <memory>
++#include <atomic>
+ #include <mutex>
+ #include <optional>
+ #include <string_view>
+@@ -686,10 +687,17 @@
+   SendDataReport(target_state);
+ }
+ 
++// wiionline (Patch 0071): Zaehler fuer die Strecke Emu-Remote -> BT-HLE (alle Slots zusammen).
++static std::atomic<std::uint32_t> s_web_rpt_calls{0}, s_web_rpt_disabled{0}, s_web_rpt_sent{0},
++    s_web_rpt_sent_pressed{0}, s_web_rpt_mode{0};
++
+ void Wiimote::SendDataReport(const DesiredWiimoteState& target_state)
+ {
++  s_web_rpt_calls.fetch_add(1, std::memory_order_relaxed);
++  s_web_rpt_mode.store(static_cast<std::uint32_t>(m_reporting_mode), std::memory_order_relaxed);
+   if (InputReportID::ReportDisabled == m_reporting_mode)
+   {
++    s_web_rpt_disabled.fetch_add(1, std::memory_order_relaxed);
+     // The wiimote is in this disabled after an extension change.
+     // Input reports are not sent, even on button change.
+     return;
+@@ -765,6 +773,9 @@
+   }
+ 
+   // Send the report:
++  s_web_rpt_sent.fetch_add(1, std::memory_order_relaxed);
++  if (m_status.buttons.hex != 0)
++    s_web_rpt_sent_pressed.fetch_add(1, std::memory_order_relaxed);
+   InterruptDataInputCallback(rpt_builder.GetDataPtr(), rpt_builder.GetDataSize());
+ 
+   // The interleaved reporting modes toggle back and forth:
+@@ -1159,6 +1170,22 @@
+   return 16;
+ }
+ 
++// Schreibt 8 uint32 nach out: [0] SendDataReport-Aufrufe [1] davon bei ReportDisabled verworfen
++// [2] an die BT-HLE gesendete Berichte [3] davon mit gedrueckter Taste [4] letzter Reporting-Modus
++// (InputReportID, z. B. 0x30 Core, 0x33 Core+Accel+IR, 0x37) [5..7] 0. Rueckgabe 8.
++WIIONLINE_EXPORT std::uint32_t WiiOnline_GetWiimoteLink(std::uint32_t* out)
++{
++  if (out == nullptr)
++    return 0;
++  out[0] = WiimoteEmu::s_web_rpt_calls.load(std::memory_order_relaxed);
++  out[1] = WiimoteEmu::s_web_rpt_disabled.load(std::memory_order_relaxed);
++  out[2] = WiimoteEmu::s_web_rpt_sent.load(std::memory_order_relaxed);
++  out[3] = WiimoteEmu::s_web_rpt_sent_pressed.load(std::memory_order_relaxed);
++  out[4] = WiimoteEmu::s_web_rpt_mode.load(std::memory_order_relaxed);
++  out[5] = out[6] = out[7] = 0;
++  return 8;
++}
++
+ // Testzugang: ruft den echten Wiimote::PrepareInput-/BuildDesiredWiimoteState-Pfad der emulierten
+ // Remote auf (die BT-Verbindung des Gastes ist dafuer nicht noetig) und liefert das Ergebnis.
+ // out: 16 uint32: [0] ButtonData.hex  [1..3] Beschleunigung x,y,z (10 Bit)  [4..7] IR-Punkt 0..3 als
