@@ -16,7 +16,7 @@
  extern "C" int DolphinWeb_UseWorkerOwnedWebGL();
  extern "C" int DolphinWeb_UseDiagnosticOglClear();
  extern "C" int DolphinWeb_UseOglReadbackPresent();
-@@ -78,9 +81,59 @@
+@@ -78,9 +81,20 @@
    glBindFramebuffer(GL_FRAMEBUFFER, 0);
    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
    glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -32,57 +32,20 @@
 +    const size = $1 * $2 * 4;
 +    if (!Module.__dolphinRbBuf || Module.__dolphinRbBuf.length !== size)
 +      Module.__dolphinRbBuf = new Uint8Array(size);
-+    if ($3 == 1 && ctx.commit) ctx.commit();
-+    if ($3 == 2) ctx.finish();
-+    if ($3 == 3) { ctx.flush(); }
-+    const t0 = performance.now();
-+    if ($3 == 4) {
-+      // Variante: Standard-Framebuffer erst in eine Textur kopieren, dann aus einem eigenen FBO lesen.
-+      if (!Module.__rbFbo || Module.__rbFboW !== $1 || Module.__rbFboH !== $2) {
-+        Module.__rbTex = ctx.createTexture();
-+        const prev = ctx.getParameter(ctx.TEXTURE_BINDING_2D);
-+        ctx.bindTexture(ctx.TEXTURE_2D, Module.__rbTex);
-+        ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, $1, $2, 0, ctx.RGBA, ctx.UNSIGNED_BYTE, null);
-+        ctx.bindTexture(ctx.TEXTURE_2D, prev);
-+        Module.__rbFbo = ctx.createFramebuffer();
-+        const pf = ctx.getParameter(ctx.FRAMEBUFFER_BINDING);
-+        ctx.bindFramebuffer(ctx.FRAMEBUFFER, Module.__rbFbo);
-+        ctx.framebufferTexture2D(ctx.FRAMEBUFFER, ctx.COLOR_ATTACHMENT0, ctx.TEXTURE_2D, Module.__rbTex, 0);
-+        ctx.bindFramebuffer(ctx.FRAMEBUFFER, pf);
-+        Module.__rbFboW = $1; Module.__rbFboH = $2;
-+      }
-+      const prevTex = ctx.getParameter(ctx.TEXTURE_BINDING_2D);
-+      const prevFb = ctx.getParameter(ctx.FRAMEBUFFER_BINDING);
-+      ctx.bindFramebuffer(ctx.FRAMEBUFFER, null);
-+      ctx.bindTexture(ctx.TEXTURE_2D, Module.__rbTex);
-+      ctx.copyTexSubImage2D(ctx.TEXTURE_2D, 0, 0, 0, 0, 0, $1, $2);
-+      ctx.bindTexture(ctx.TEXTURE_2D, prevTex);
-+      ctx.bindFramebuffer(ctx.FRAMEBUFFER, Module.__rbFbo);
-+      ctx.readPixels(0, 0, $1, $2, ctx.RGBA, ctx.UNSIGNED_BYTE, Module.__dolphinRbBuf);
-+      ctx.bindFramebuffer(ctx.FRAMEBUFFER, prevFb);
-+    } else {
-+      ctx.readPixels(0, 0, $1, $2, ctx.RGBA, ctx.UNSIGNED_BYTE, Module.__dolphinRbBuf);
-+    }
-+    const t1 = performance.now();
-+    HEAPU8.set(Module.__dolphinRbBuf, $0);
-+    const t2 = performance.now();
-+    if (!Module.__rbSmall) Module.__rbSmall = new Uint8Array(64 * 64 * 4);
-+    ctx.readPixels(0, 0, 64, 64, ctx.RGBA, ctx.UNSIGNED_BYTE, Module.__rbSmall);
-+    const t3 = performance.now();
 +    ctx.readPixels(0, 0, $1, $2, ctx.RGBA, ctx.UNSIGNED_BYTE, Module.__dolphinRbBuf);
-+    const t4 = performance.now();
-+    const d = Module.__rbDiag || (Module.__rbDiag = [0, 0, 0, 0]);
-+    d[0] += t1 - t0; d[1] += t2 - t1; d[2] += t3 - t2; d[3] += t4 - t3;
++    HEAPU8.set(Module.__dolphinRbBuf, $0);
 +    return 1;
-+  }, s_readback_data.data(), width, height, DolphinWeb_OglFlag(2));
++  }, s_readback_data.data(), width, height);
 +  if (!rb_ok || glGetError() != GL_NO_ERROR)
      return 0;
  
    const std::uint32_t published_rgba = static_cast<std::uint32_t>(s_readback_data[0]) |
-@@ -300,8 +353,81 @@
-   m_backbuffer_height = 480;
- }
+@@ -298,10 +312,108 @@
  
+   m_backbuffer_width = 640;
+   m_backbuffer_height = 480;
++}
++
 +extern "C" unsigned DolphinWeb_XfbCopyCount();
 +
 +// wiionline (Patch 0073): Zeitmessung des Readbacks je Swap (Diagnose).
@@ -103,16 +66,23 @@
 +
 +// Diagnose: WebGL-Aufrufzaehler/-zeiten (Kontext des GPU-Threads), je Swap in dieses Feld exportiert.
 +static double s_web_gl_stats[48];
++static char s_web_gl_names[8192];
++extern "C" const char* DolphinWeb_OglGlNames()
++{
++  return s_web_gl_names;
+ }
 +extern "C" double DolphinWeb_OglGlStat(int i)
 +{
 +  return (i >= 0 && i < 48) ? s_web_gl_stats[i] : 0.0;
 +}
-+
+ 
  void GLContextEmscripten::Swap()
  {
 +  const double swap_t0 = emscripten_get_now();
++  // Diagnose-Wrapper (verlangsamen jeden GL-Aufruf): nur mit Module.dolphinOglFeatureMask Bit 1 (Wert 2).
++  const bool gl_diag = (DolphinWeb_OglFlag(3) & 2) != 0;
 +  static bool s_gl_stats_installed = false;
-+  if (!s_gl_stats_installed)
++  if (gl_diag && !s_gl_stats_installed)
 +  {
 +    s_gl_stats_installed = true;
 +    EM_ASM({ Module.__glSyncMode = $0; }, DolphinWeb_OglFlag(2));
@@ -145,6 +115,15 @@
 +            return r;
 +          };
 +        }
++        const all = Module.__glAll = {};
++        for (const k in ctx) {
++          let fn; try { fn = ctx[k]; } catch (e) { continue; }
++          if (typeof fn !== 'function' || k === 'getError' || /^(get|is)/.test(k) && false) continue;
++          if (names.includes(k)) continue;
++          all[k] = 0;
++          const orig2 = fn;
++          ctx[k] = function() { all[k]++; return orig2.apply(this, arguments); };
++        }
 +        Module.__glExport = function(ptr) {
 +          let i = 0;
 +          for (const n of names) {
@@ -157,11 +136,20 @@
 +      })();
 +    )JS");
 +  }
-+  EM_ASM({ if (Module.__glExport) Module.__glExport($0); }, s_web_gl_stats);
++  if (gl_diag)
++    EM_ASM({ if (Module.__glExport) Module.__glExport($0); }, s_web_gl_stats);
++  static unsigned s_names_counter = 0;
++  if (gl_diag && (++s_names_counter % 20) == 0)
++    EM_ASM({
++      if (!Module.__glAll) return;
++      const o = {};
++      for (const k in Module.__glAll) if (Module.__glAll[k]) o[k] = Module.__glAll[k];
++      stringToUTF8(JSON.stringify(o), $0, 8192);
++    }, s_web_gl_names);
    static std::uint32_t s_diagnostic_clear_frame = 0;
    std::uint32_t readback_rgba = 0;
    if (DolphinWebUseDiagnosticClear())
-@@ -326,7 +452,37 @@
+@@ -326,7 +438,37 @@
  
    const bool worker_owned_webgl = DolphinWeb_UseWorkerOwnedWebGL() != 0;
    if (worker_owned_webgl && DolphinWebUseOglReadbackPresent())
@@ -200,7 +188,7 @@
  
    const std::uint32_t debug_bits = DolphinWebOglDebugBits();
    const int gl_error = static_cast<int>(glGetError());
-@@ -428,6 +584,9 @@
+@@ -428,6 +570,9 @@
      // happening before transferToImageBitmap captured the next frame.
      // For now, accept the over-speed; pace via something else later.
    }
