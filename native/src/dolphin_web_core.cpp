@@ -622,7 +622,15 @@ void EnsureRuntime()
   Config::SetBase(Config::MAIN_SLOT_B, ExpansionInterface::EXIDeviceType::None);
   Config::SetBase(Config::MAIN_AUDIO_BACKEND, std::string("Web Audio"));
   Config::SetBase(Config::MAIN_AUDIO_MUTED, false);
-  Config::SetBase(Config::GFX_HACK_SKIP_XFB_COPY_TO_RAM, s_video_backend == "OGL");
+  // Diagnose: Module.dolphinOglXfbCopyToRam=true schaltet das Ueberspringen der XFB-Kopie ins Gast-RAM ab.
+  const bool ogl_xfb_copy_to_ram = EM_ASM_INT({ return (typeof Module !== 'undefined' &&
+                                                         Module['dolphinOglXfbCopyToRam']) ? 1 : 0; }) != 0;
+  Config::SetBase(Config::GFX_HACK_SKIP_XFB_COPY_TO_RAM, s_video_backend == "OGL" && !ogl_xfb_copy_to_ram);
+  // Diagnose: Module.dolphinOglEfbCopyToRam=true schreibt EFB-Texturkopien ins Gast-RAM (wie der Software-Renderer).
+  const bool ogl_efb_copy_to_ram = EM_ASM_INT({ return (typeof Module !== 'undefined' &&
+                                                         Module['dolphinOglEfbCopyToRam']) ? 1 : 0; }) != 0;
+  if (ogl_efb_copy_to_ram)
+    Config::SetBase(Config::GFX_HACK_SKIP_EFB_COPY_TO_RAM, false);
   Config::SetBase(Config::GFX_HACK_COPY_EFB_SCALED, false);
   // §28cx: ubershaders DISCRIMINATOR (May-30). The UBO const-index fix made the
   // uber pixel shaders translate (fail 27->0) and 7195 draws execute, but the EFB

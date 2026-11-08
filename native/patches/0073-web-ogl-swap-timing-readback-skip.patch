@@ -1,0 +1,83 @@
+--- a/Source/Core/Common/GL/GLInterface/Emscripten.cpp
++++ b/Source/Core/Common/GL/GLInterface/Emscripten.cpp
+@@ -7,6 +7,7 @@
+ #include <cstdint>
+ #include <thread>
+ #include <vector>
++#include <atomic>
+ #include <emscripten/console.h>
+ #include <emscripten/emscripten.h>
+ #include <emscripten/html5.h>
+@@ -298,10 +299,28 @@
+ 
+   m_backbuffer_width = 640;
+   m_backbuffer_height = 480;
++}
++
++extern "C" unsigned DolphinWeb_XfbCopyCount();
++
++// wiionline (Patch 0073): Zeitmessung des Readbacks je Swap (Diagnose).
++static std::atomic<std::uint64_t> s_web_swap_total_us{0}, s_web_swap_rb_us{0}, s_web_swap_rb_max_us{0},
++    s_web_swap_calls{0}, s_web_swap_rb_calls{0};
++extern "C" unsigned long long DolphinWeb_OglSwapTiming(int which)
++{
++  switch (which)
++  {
++  case 0: return s_web_swap_calls.load(std::memory_order_relaxed);
++  case 1: return s_web_swap_total_us.load(std::memory_order_relaxed);
++  case 2: return s_web_swap_rb_us.load(std::memory_order_relaxed);
++  case 4: return s_web_swap_rb_calls.load(std::memory_order_relaxed);
++  default: return s_web_swap_rb_max_us.load(std::memory_order_relaxed);
++  }
+ }
+ 
+ void GLContextEmscripten::Swap()
+ {
++  const double swap_t0 = emscripten_get_now();
+   static std::uint32_t s_diagnostic_clear_frame = 0;
+   std::uint32_t readback_rgba = 0;
+   if (DolphinWebUseDiagnosticClear())
+@@ -326,7 +345,32 @@
+ 
+   const bool worker_owned_webgl = DolphinWeb_UseWorkerOwnedWebGL() != 0;
+   if (worker_owned_webgl && DolphinWebUseOglReadbackPresent())
+-    readback_rgba = DolphinWebPublishAsyncReadback(m_backbuffer_width, m_backbuffer_height);
++  {
++    // Patch 0075: Readback nur bei neuem Bildinhalt (neue EFB->XFB-Kopie) bzw. spaetestens alle 30 Swaps
++    // oder bei geaenderter Groesse; Module.dolphinOglReadbackEverySwap=true stellt das alte Verhalten her.
++    static const bool s_every_swap = EM_ASM_INT({ return (typeof Module !== 'undefined' &&
++                                                            Module['dolphinOglReadbackEverySwap']) ? 1 : 0; }) != 0;
++    static unsigned s_last_xfb_copies = ~0u;
++    static std::uint32_t s_last_w = 0, s_last_h = 0;
++    static unsigned s_swaps_since_readback = 0;
++    const unsigned xfb_copies = DolphinWeb_XfbCopyCount();
++    const bool changed = s_every_swap || xfb_copies != s_last_xfb_copies || s_last_w != m_backbuffer_width ||
++                         s_last_h != m_backbuffer_height || ++s_swaps_since_readback >= 30;
++    const double rb_t0 = emscripten_get_now();
++    if (changed)
++    {
++      s_last_xfb_copies = xfb_copies;
++      s_last_w = m_backbuffer_width;
++      s_last_h = m_backbuffer_height;
++      s_swaps_since_readback = 0;
++      readback_rgba = DolphinWebPublishAsyncReadback(m_backbuffer_width, m_backbuffer_height);
++      s_web_swap_rb_calls.fetch_add(1, std::memory_order_relaxed);
++    }
++    const auto rb_us = static_cast<std::uint64_t>((emscripten_get_now() - rb_t0) * 1000.0);
++    s_web_swap_rb_us.fetch_add(rb_us, std::memory_order_relaxed);
++    if (rb_us > s_web_swap_rb_max_us.load(std::memory_order_relaxed))
++      s_web_swap_rb_max_us.store(rb_us, std::memory_order_relaxed);
++  }
+ 
+   const std::uint32_t debug_bits = DolphinWebOglDebugBits();
+   const int gl_error = static_cast<int>(glGetError());
+@@ -428,6 +472,9 @@
+     // happening before transferToImageBitmap captured the next frame.
+     // For now, accept the over-speed; pace via something else later.
+   }
++  s_web_swap_calls.fetch_add(1, std::memory_order_relaxed);
++  s_web_swap_total_us.fetch_add(static_cast<std::uint64_t>((emscripten_get_now() - swap_t0) * 1000.0),
++                                std::memory_order_relaxed);
+ }
+ 
+ void GLContextEmscripten::SwapInterval(int interval)

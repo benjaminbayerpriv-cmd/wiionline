@@ -518,6 +518,11 @@ std::string RasterProfileStats()
   return out.str();
 }
 
+extern "C" unsigned DolphinWeb_PeCounter(int which);
+extern "C" unsigned DolphinWeb_PiIrqCount(int bit);
+extern "C" unsigned DolphinWeb_XfbCopyCount();
+extern "C" unsigned long long DolphinWeb_OglSwapTiming(int which);
+
 std::string OglSwapStats()
 {
   std::ostringstream out;
@@ -528,7 +533,15 @@ std::string OglSwapStats()
       << s_last_ogl_height.load(std::memory_order_relaxed)
       << " bits:" << s_last_ogl_debug_bits.load(std::memory_order_relaxed) << " rb:0x"
       << std::hex << s_last_ogl_readback_rgba.load(std::memory_order_relaxed)
-      << " glerr:0x" << s_last_ogl_gl_error.load(std::memory_order_relaxed) << std::dec;
+      << " glerr:0x" << s_last_ogl_gl_error.load(std::memory_order_relaxed) << std::dec
+      << " pe:" << DolphinWeb_PeCounter(0) << "/" << DolphinWeb_PeCounter(2) << "/"
+      << DolphinWeb_PeCounter(1) << "/" << DolphinWeb_PeCounter(3) << "/" << DolphinWeb_PeCounter(4);
+  out << " swapt:" << DolphinWeb_OglSwapTiming(0) << "/" << DolphinWeb_OglSwapTiming(1) << "/"
+      << DolphinWeb_OglSwapTiming(2) << "/" << DolphinWeb_OglSwapTiming(3) << "/" << DolphinWeb_OglSwapTiming(4);
+  out << " xfbc:" << DolphinWeb_XfbCopyCount();
+  out << " irq:";
+  for (int b = 0; b < 15; ++b)
+    out << DolphinWeb_PiIrqCount(b) << (b < 14 ? "/" : "");
   return out.str();
 }
 

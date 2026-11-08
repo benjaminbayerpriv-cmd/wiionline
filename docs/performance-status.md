@@ -102,3 +102,17 @@ Spannweite aller Zweikern-Modi 2,93–3,17 (±4 % um den Mittelwert). Mit n = 1 
 **Nächste Messung (nicht gestartet):** OGL/WebGL2-Versuch laut `docs/ogl-feasibility.md` in sichtbarem Chrome mit echter GPU (`dolphinOglReadbackPresent`, `SetVideoBackend('OGL')`), Erfolg ≥ 20 verschiedene Bilder/s bei Spielzeit ≥ 0,9; danach, falls verworfen, Profilierung des Rasterizers pro Pixel (TEV/Textur) als Grundlage für Mehrthread/SIMD.
 
 **Blocker:** OGL-Pfad im Kern ungeprüft (Melee-Vorlauf nur ~1,3 Bilder/s mit Readback); headless Chrome nutzt SwiftShader und taugt nicht für OGL-Zahlen; ein echter Minispiel-Test braucht einen funktionierenden Eingabe-Pfad über die Mii-Auswahl hinaus; Mehrthread-Rasterizer erfordert Eingriffe an Kernquellen und neuen Build (nicht beauftragt).
+
+## OGL-„Stillstand“ (2026-11-08): Befund, kein Hänger
+
+**Kernaussage:** Der Gast bleibt in OGL nicht stehen; er reagiert auf A erst nach ~100 s statt nach ~35 s, weil das Spiel in OGL nur ~3 statt ~18 Frames/s abgibt. Die Warnseite nimmt A erst nach einer Zahl von Spiel-Frames an (Hypothese, passend zu den Daten).
+
+Belege (Chrome 157 headless/SwiftShader, Wii Play EU, Cached+WASM-JIT, Zweikern, gleiche Eingabe; Software-Renderer als Gegenprobe):
+- Gleiche Eingabe in Software: Bildwechsel sofort nach A, danach Disc-Lesen (22 702 196 B). OGL, 25 Drücke bis 75 s: nichts. OGL, Lauf bis 190 s, Drücke alle 4 s: neue Bilder ab ~79 s, Disc-Lesen ab ~100 s (dieselben 22 702 196 B). Eingabe kommt also an.
+- Eingabeweg identisch: `WiiOnline_GetWiimoteLink` (Patch 0071): Berichte an die BT-HLE, Modus 0x37, gleiche Zahlen in OGL und Software.
+- Interrupt-Ströme identisch (DSP ~1130/s, VI ~73/s, IPC ~850/s, Patch 0072); nur `PE_TOKEN/FINISH`: OGL ~3,2/s, Software ~18,6/s im Standbild. `PE_FINISH`-Aufrufe = ausgelöste Interrupts (183/183): nichts geht verloren (Patch 0070).
+- `emscripten_webgl_commit_frame`/Present: `commit:0` (Direkt-JS-Kontext, absichtlich), `glerr:0`; die frühere Erklärung „Present bricht ab, PE_FINISH bleibt aus“ trifft hier **nicht** zu.
+- Gast-RAM-Kopien (`dolphinOglXfbCopyToRam`, `dolphinOglEfbCopyToRam`) ändern nichts.
+- **GPU-Thread ist ausgelastet:** In `GLContextEmscripten::Swap` entfallen ~85 % der Wandzeit auf den Readback (`glReadPixels`), im Mittel ~9–16 ms bei ~57 Swaps/s, Spitzen bis 1,3 s (Patch 0073). Das Spiel wartet auf den GPU-Thread (Draw-Done), daher ~3 Frames/s. Die ~57 Swaps/s sind überwiegend VI-Wiederholungen; neue Inhalte (echte EFB→XFB-Kopien) nur ~0,8/s im Standbild (Patch 0074).
+
+**Grenzen/ungeklärt:** Messung nur headless mit Software-GL (SwiftShader); `glReadPixels` wartet dort auch auf die GL-Arbeit. Ein Lauf auf echter GPU (Apple M1 Pro, ANGLE/Metal) zeigte dieselbe Größenordnung (Readback ~9 ms/Swap, ~3 Frames/s), wurde aber abgebrochen, bevor die geänderte Readback-Logik ausgewertet war. Die Maßnahme „Readback nur bei neuer XFB-Kopie“ (Patch 0073 + `dolphinOglReadbackEverySwap` für das alte Verhalten) ist gebaut, ihre Wirkung ist **nicht belegt**. Ein Kern-Fix ist damit nicht nachgewiesen. Artefakt: `dolphin-core-upstream.wasm` SHA-256 `868d6c69…82fe` (Dolphin e22551e + Patches 0001–0074). Reproduktion: `scripts/core-build.sh build`, `native/perf/serve-perf.mjs` + `run-browser.mjs` mit `coreOpts` `{dolphinOglReadbackPresent,dolphinOglWorkerWebGl}`, `offscreenCanvas [640,528]`.

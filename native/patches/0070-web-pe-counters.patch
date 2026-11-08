@@ -1,0 +1,78 @@
+--- a/Source/Core/VideoCommon/PixelEngine.cpp
++++ b/Source/Core/VideoCommon/PixelEngine.cpp
+@@ -1,6 +1,8 @@
+ // Copyright 2008 Dolphin Emulator Project
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ 
++#include <atomic>
++
+ #include "VideoCommon/PixelEngine.h"
+ 
+ #include <mutex>
+@@ -24,6 +26,13 @@
+ 
+ namespace PixelEngine
+ {
++// Web diagnostics (patch 0070): GP->CPU PE event counters, read by dolphin_web_discio.cpp.
++std::atomic<u32> g_web_pe_finish_calls{0};
++std::atomic<u32> g_web_pe_token_calls{0};
++std::atomic<u32> g_web_pe_finish_irq{0};
++std::atomic<u32> g_web_pe_token_irq{0};
++std::atomic<u32> g_web_pe_last_token{0};
++
+ enum
+ {
+   INT_CAUSE_PE_TOKEN = 0x200,   // GP Token
+@@ -183,9 +192,11 @@
+   m_event_raised = false;
+ 
+   m_token = m_token_pending;
++  g_web_pe_last_token.store(m_token, std::memory_order_relaxed);
+ 
+   if (m_token_interrupt_pending)
+   {
++    g_web_pe_token_irq.fetch_add(1, std::memory_order_relaxed);
+     m_token_interrupt_pending = false;
+     m_signal_token_interrupt = true;
+     UpdateInterrupts();
+@@ -193,6 +204,7 @@
+ 
+   if (m_finish_interrupt_pending)
+   {
++    g_web_pe_finish_irq.fetch_add(1, std::memory_order_relaxed);
+     m_finish_interrupt_pending = false;
+     m_signal_finish_interrupt = true;
+     UpdateInterrupts();
+@@ -230,6 +242,7 @@
+ {
+   DEBUG_LOG_FMT(PIXELENGINE, "VIDEO Backend raises INT_CAUSE_PE_TOKEN (btw, token: {:04x})", token);
+ 
++  g_web_pe_token_calls.fetch_add(1, std::memory_order_relaxed);
+   std::lock_guard lk(m_token_finish_mutex);
+ 
+   m_token_pending = token;
+@@ -244,6 +257,7 @@
+ {
+   DEBUG_LOG_FMT(PIXELENGINE, "VIDEO Set Finish");
+ 
++  g_web_pe_finish_calls.fetch_add(1, std::memory_order_relaxed);
+   std::lock_guard lk(m_token_finish_mutex);
+ 
+   m_finish_interrupt_pending |= true;
+@@ -252,3 +266,16 @@
+ }
+ 
+ }  // namespace PixelEngine
++
++extern "C" unsigned DolphinWeb_PeCounter(int which)
++{
++  using namespace PixelEngine;
++  switch (which)
++  {
++  case 0: return g_web_pe_finish_calls.load(std::memory_order_relaxed);
++  case 1: return g_web_pe_token_calls.load(std::memory_order_relaxed);
++  case 2: return g_web_pe_finish_irq.load(std::memory_order_relaxed);
++  case 3: return g_web_pe_token_irq.load(std::memory_order_relaxed);
++  default: return g_web_pe_last_token.load(std::memory_order_relaxed);
++  }
++}
