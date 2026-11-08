@@ -19,10 +19,12 @@ if (oc !== 1) c("SetCpuOverclock", "number", ["number"], [oc]);
 c("SetAudioMuted", "number", ["number"], [Number(opt("mute", 1))]); c("CoreInit", "number", [], []);
 const t0 = performance.now();
 if (!c("BootDisc", "number", ["string"], [file])) throw new Error("Boot: " + c("GetCoreStatus", "string", [], []));
+if (typeof M._SetSoftwareRasterProfileEnabled !== "function") throw new Error("Kernprofil-Export fehlt");
+c("SetSoftwareRasterProfileEnabled", "number", ["number"], [1]);
 const num = (n) => (typeof M["_" + n] === "function" ? Number(c(n, "number", [], [])) >>> 0 : null);
 const ticks = () => Number((BigInt(num("GetCoreTicksHigh")) << 32n) | BigInt(num("GetCoreTicksLow")));
 const samples = []; const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const snap = () => ({ wall: (performance.now() - t0) / 1000, ticks: ticks(), tps: num("GetCoreTicksPerSecond"), frameGen: num("GetFrame"), pc: num("GetPPCPC"), jitCompiled: num("GetPpcWasmBlockCompileCount"), jitRuns: num("GetPpcWasmBlockRunCount"), state: c("GetCoreStateName", "string", [], []) });
+const snap = () => { const stats = c("GetVideoStats", "string", [], []); const counter = (name) => Number(new RegExp(`(?:^|\\s)${name}:(\\d+)`).exec(stats)?.[1] ?? NaN); return { wall: (performance.now() - t0) / 1000, ticks: ticks(), tps: num("GetCoreTicksPerSecond"), frameGen: num("GetFrame"), xfbCopies: counter("xfbgen"), drawBatches: counter("drawbatch"), pc: num("GetPPCPC"), jitCompiled: num("GetPpcWasmBlockCompileCount"), jitRuns: num("GetPpcWasmBlockRunCount"), state: c("GetCoreStateName", "string", [], []) }; };
 while ((performance.now() - t0) / 1000 < seconds) { c("PumpHostJobs", null, [], []); samples.push(snap()); await sleep(250); }
 const out = { cfg: { video, cpu, jit, thread, speed, oc, seconds, disc: path.basename(disc), node: process.version }, tps: samples[samples.length-1].tps, title: c("GetCoreTitle", "string", [], []), status: c("GetCoreStatus", "string", [], []),
   videoStats: c("GetVideoStats", "string", [], []), ppcProfile: typeof M._GetPpcProfileStats === "function" ? c("GetPpcProfileStats", "string", [], []) : null, samples };
