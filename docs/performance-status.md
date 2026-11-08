@@ -70,3 +70,35 @@ Eingabeereignisse wurden tatsächlich bei 12,01/13,02/24,06/25,01/36,05/37,02 Ga
 Ein zusätzlicher 30-Gastsekunden-Lauf mit `SetPpcProfileEnabled(1)` zählte am VI/SI-Throttle-Punkt 122 Aufrufe, davon 68 langsame, mit insgesamt 2,98 s Wartezeit und 47,5 ms Maximum. Diese Profilzahlen gelten für den ganzen Lauf und werden wegen des zusätzlichen Profil-Overheads nicht direkt mit der obigen Fenster-Tabelle verrechnet. `rast` aus dem älteren Profil ist innerhalb dieser Läufe nicht monoton; daraus wird keine Draw-Rate berechnet. Der neue `drawbatch`-Zähler blieb monoton.
 
 Reproduktion nach dem Build: `node native/perf/serve-perf.mjs 8124 dist-core /absoluter/pfad/zur/lokalen/Wii-Play.rvz` starten; anschließend `node native/perf/run-browser.mjs '<JSON-Konfiguration>' > messung.json` und `python3 native/perf/summarize.py < messung.json`. Die exakten JSON-Konfigurationen einschließlich Gastzeitfenster und Eingaben stehen in `cfg` jeder Rohdatei. Die Disc wird weder kopiert noch committet.
+
+## Abschluss der FastSW/TEV-Messreihe (2026-11-08)
+
+Die Reihe ist beendet; es läuft keine Messung oder Build mehr. Keine weiteren Läufe sind gestartet.
+
+**Aufbau (reproduzierbar).** Chrome 157 headless per CDP, Dolphin e22551e, WASM-SHA-256 `42f67e40…c0a1` (Build siehe oben), Software Renderer, Cached + WASM-JIT, Zweikern (`thread 1`), Throttle an, Rasterprofil an, Audio stumm, 85 s Lauf, davon 30 s Aufwärmen, A-Taste bei 12/20/30/40 Gastsekunden. Die exakten Konfigurationen stehen unter `native/perf/data/matrix-cfg/` (`f0`–`f5`: `fastsw` 1/2/3 und `tevhot` 1/2/3 einzeln; `p1` = Standard Zweikern; `t0` = Einkern). Ausführung: `native/perf/run-matrix.sh` (liest dort `/tmp/perf/f<i>cfg.json`, Kopie der Dateien dorthin legen) bzw. `node native/perf/run-browser.mjs "$(cat <cfg>)"`. Ausgewertet in `docs/evidence/perf-matrix.json` (30-s-Fenster; Zuordnung der Zeilen `dual_default`/`single_core` zu `p1`/`t0` nach Parametern, nicht über gespeicherte Labels). Die Rohdateien der Läufe `f0`–`f5` liegen nur in `/tmp/perf` und sind nicht eingecheckt (zu groß, ca. 8 MB je Lauf mit Hashes); eingecheckt sind Konfiguration und Auswertung.
+
+**Ergebnis (je ein Lauf, Titelbildschirm, EFB→XFB-Kopien):**
+
+| Modus | Kopien/Wandsek. | Spielzeit-Rate |
+|---|---:|---:|
+| Standard | 2,93 | 1,00 |
+| `fastsw` 1 / 2 / 3 | 2,96 / 2,99 / 3,07 | 1,00 |
+| `tevhot` 1 / 2 / 3 | 3,17 / 3,09 / 3,08 | 1,00 |
+| Einkern (Gegenprobe) | 3,74 (= 59,94 pro Spielsek., Spielzeit 0,06) | 0,06 |
+
+Spannweite aller Zweikern-Modi 2,93–3,17 (±4 % um den Mittelwert). Mit n = 1 je Modus ist das nicht von Rauschen zu unterscheiden; **kein Modus beschleunigt messbar**. Die Kopie selbst dauert ~15 ms und ist nicht der Engpass.
+
+**Engpass (belegt):** Der Software-Rasterizer (Draw-Batches mit TEV/Textur) liefert auf einem Thread ~3 abgeschlossene EFB→XFB-Kopien pro Wandsekunde, während das Spiel in Gastzeit ~60 Kopien/s anstößt (Einkern-Gegenprobe). Pacing, Wiimote und Seite sind ausgeschlossen (siehe oben).
+
+**Grenzen der Aussagen:**
+- Nur Titelbildschirm/Menü bis Mii-Auswahl; kein Minispiel, andere Szenen können schwerer oder leichter sein.
+- Ein Rechner (Apple Silicon, 10 Kerne), nur headless Chrome 157; kein Firefox/Safari; je Modus ein Lauf, keine Streuung.
+- Die Rasterzeit beruht auf 1:64-Stichproben; Eingabelatenz (~2 s) ist nicht direkt gemessen.
+- Fenster/Auswertung: die Wandzeiten der Tabelle (29,7 s bzw. 20,1 s) sind Auswertefenster, nicht die Lauflänge.
+
+### Getrennt: Ist ein Kern-Fix durch Daten belegt?
+**Nein.** Belegt ist nur, was nicht hilft: die vorhandenen Schnellmodi (`SetFastSoftwareRaster`, `SetSoftwareTevHotCaseMode`), das Abschalten des WASM-JIT (4,00 statt 3,37 Kopien/Gastsek., also JIT nicht ursächlich) und das Entfernen des Throttles (weniger Kopien pro Gastsekunde). Kein Standardwert wurde geändert, kein Kernpatch dafür geschrieben.
+
+**Nächste Messung (nicht gestartet):** OGL/WebGL2-Versuch laut `docs/ogl-feasibility.md` in sichtbarem Chrome mit echter GPU (`dolphinOglReadbackPresent`, `SetVideoBackend('OGL')`), Erfolg ≥ 20 verschiedene Bilder/s bei Spielzeit ≥ 0,9; danach, falls verworfen, Profilierung des Rasterizers pro Pixel (TEV/Textur) als Grundlage für Mehrthread/SIMD.
+
+**Blocker:** OGL-Pfad im Kern ungeprüft (Melee-Vorlauf nur ~1,3 Bilder/s mit Readback); headless Chrome nutzt SwiftShader und taugt nicht für OGL-Zahlen; ein echter Minispiel-Test braucht einen funktionierenden Eingabe-Pfad über die Mii-Auswahl hinaus; Mehrthread-Rasterizer erfordert Eingriffe an Kernquellen und neuen Build (nicht beauftragt).

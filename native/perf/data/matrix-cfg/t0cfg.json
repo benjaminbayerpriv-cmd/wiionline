@@ -1,0 +1,1 @@
+{"video": "Software Renderer", "cpu": "cached", "thread": 0, "jit": 1, "speed": 1, "oc": 1, "mute": 1, "seconds": 120, "warmup": 30, "label": "T0", "profile": true, "shots": [], "script": [{"t": 12, "b": 1, "x": 0.5, "y": 0.5, "v": 1}, {"t": 12.4, "b": 0}, {"t": 20, "b": 1}, {"t": 20.4, "b": 0}, {"t": 30, "b": 1}, {"t": 30.4, "b": 0}, {"t": 40, "b": 1}, {"t": 40.4, "b": 0}]}
