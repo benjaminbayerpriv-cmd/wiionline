@@ -13,10 +13,11 @@ self.onmessage = async (e) => {
   gl.useProgram(prog); gl.uniformBlockBinding(prog, gl.getUniformBlockIndex(prog, "U"), 0);
   const STREAM = F.has("bigstream") ? 8 * 1024 * 1024 : 64 * 1024;
   const vbuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbuf); gl.bufferData(gl.ARRAY_BUFFER, STREAM, gl.STREAM_DRAW);
-  const ubuf = gl.createBuffer(); gl.bindBuffer(gl.UNIFORM_BUFFER, ubuf); gl.bufferData(gl.UNIFORM_BUFFER, 4096, gl.STREAM_DRAW); gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, ubuf);
+  const ubuf = gl.createBuffer(); gl.bindBuffer(gl.UNIFORM_BUFFER, ubuf); const UBS = F.has("bigubo") ? 16 * 1024 * 1024 : 4096; gl.bufferData(gl.UNIFORM_BUFFER, UBS, gl.STREAM_DRAW); gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, ubuf); let uoff = 0;
   const pl = gl.getAttribLocation(prog, "p"), cl = gl.getAttribLocation(prog, "col"); gl.enableVertexAttribArray(pl); gl.enableVertexAttribArray(cl);
   const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(256 * 256 * 4).fill(200));
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  if (F.has("sampler")) { const sm = gl.createSampler(); gl.samplerParameteri(sm, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.samplerParameteri(sm, gl.TEXTURE_MAG_FILTER, gl.NEAREST); gl.bindSampler(0, sm); }
   let efb = null;
   if (F.has("efbfbo")) { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null); const d = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, d); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, w, h);
     efb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, efb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0); gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, d); gl.bindTexture(gl.TEXTURE_2D, tex); }
@@ -35,6 +36,7 @@ self.onmessage = async (e) => {
       const data = quad(1); const bytes = data.byteLength;
       if (F.has("advance")) { if (off + bytes > STREAM) off = 0; gl.bindBuffer(gl.ARRAY_BUFFER, vbuf); gl.bufferSubData(gl.ARRAY_BUFFER, off, data); gl.vertexAttribPointer(pl, 2, gl.FLOAT, false, 24, off); gl.vertexAttribPointer(cl, 4, gl.FLOAT, false, 24, off + 8); off += bytes; }
       else { gl.bindBuffer(gl.ARRAY_BUFFER, vbuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, data); gl.vertexAttribPointer(pl, 2, gl.FLOAT, false, 24, 0); gl.vertexAttribPointer(cl, 4, gl.FLOAT, false, 24, 8); }
+      if (F.has("ubrange")) { if (uoff + 512 > UBS) uoff = 0; gl.bindBuffer(gl.UNIFORM_BUFFER, ubuf); gl.bufferSubData(gl.UNIFORM_BUFFER, uoff, new Float32Array(32).fill(1)); gl.bindBufferRange(gl.UNIFORM_BUFFER, 0, ubuf, uoff, 128); uoff += 256; }
       if (F.has("ubo")) { gl.bindBuffer(gl.UNIFORM_BUFFER, ubuf); gl.bufferSubData(gl.UNIFORM_BUFFER, 0, new Float32Array(32).fill(1)); }
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }

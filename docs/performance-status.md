@@ -142,3 +142,21 @@ Mit SwiftShader-ANGLE läuft OGL funktional: 393 verschiedene Bilder in 45 s (~1
 - **Belegt:** (1) OGL im Kern funktioniert; (2) die ~1-s-Wartezeit je Readback entsteht im Browser-GPU-Prozess unter ANGLE/Metal für diese Last; (3) dieselbe Last ist mit ANGLE/SwiftShader ~18-mal schneller.
 - **Nicht belegt:** welche GL-Eigenschaft Metal ausbremst (Vermutungen: Vertex-Attribut-Konvertierung, Zustandsvarianten/PSO-Bau, Puffer-Umbenennung); ob andere Chrome-Versionen/Rechner betroffen sind; ob `chrome://flags` → „Choose ANGLE graphics backend“ die SwiftShader-Option anbietet (nur die Kommandozeile getestet). SwiftShader ist Software-GL und belastet die CPU (neben den Emulator-Threads); eine Dauerlösung ist das nicht.
 - **Nächste Schritte:** (a) mit einer kleinen eigenständigen WebGL2-Seite oder durch gezieltes Abschalten einzelner Dolphin-GL-Zustände (z. B. Vertex-Formate, Blend/ColorMask-Wechsel) das Metal-Auslöser-Merkmal eingrenzen und dann im Kern vermeiden; (b) andere Chrome-/Safari-/Firefox-Versionen messen; (c) bis dahin für Tests SwiftShader-ANGLE nutzen.
+
+## Lösung für OGL (2026-11-08): Stream-Puffer verkleinert, Patch 0077
+
+**Ursache (belegt):** Auf WebGL nutzt Dolphin `BufferSubData`-Streaming mit riesigen GL-Puffern (Vertex 48 MB, Index 8 MB, Uniform 64 MB), die bei jedem Draw am Anfang überschrieben werden. ANGLE (Metal; auf Windows Direct3D11 vermutlich genauso) muss den gerade benutzten Puffer dafür jedes Mal komplett umkopieren. Chrome-Trace: `glDrawElements` ~57 ms und `glDrawArrays` ~50 ms **je Draw** im GPU-Prozess, 90 % der GPU-Prozess-Zeit, viel `memmove`. Mikrotest: ein 16-MB-Uniform-Puffer macht denselben Frame ~7× langsamer (`native/perf/microgl/`). SwiftShader war schnell, weil es Puffer nicht umkopiert.
+
+**Fix:** `native/patches/0077-web-ogl-small-stream-buffers.patch`: Der GL-Puffer wird bei Emscripten mit 256 KB angelegt und nur bei Bedarf vergrößert (Schreiben bleibt bei Offset 0, CPU-Zwischenspeicher unverändert).
+
+**Messung** (Chrome 157 headless, Apple M1 Pro/Metal, Wii Play, OGL+Readback, 25 s, vorher → nachher):
+
+| | vorher | nachher |
+|---|---:|---:|
+| Spiel-Frames (`PE_FINISH`) | 52 (≈ 2,6/s) | 979 (≈ 49/s) |
+| mittlerer Readback | ~950 ms | ~10 ms |
+| verschiedene Bilder in 25 s | 20–23 | 47–50 |
+
+60-s-Lauf mit A-Drücken (14/20/26/32/40/48 s): Sicherheitshinweis → Zeigerseite → Titelbildschirm „Press A and B“ mit sichtbarem Zeiger; Disc-Lesen `22 702 196` Byte wie im Software-Lauf; verschiedene Bilder im Mittel ~9/s im Spiel (433 in 60 s); Spielzeit 1,0.
+
+**Grenzen:** Ein Rechner (Apple M1 Pro), nur Headless-Chrome 157; Windows (D3D11) und andere Browser nicht gemessen (Ursache dort plausibel, aber ungeprüft). Die ~9 verschiedenen Bilder pro Sekunde in der Menüphase sind noch nicht 60; ob das Spiel dort mehr zeigt oder der synchrone Readback (~10 ms) bremst, ist offen. Kein Minispiel getestet. Der Software-Renderer ist vom Fix nicht betroffen (~3 Kopien/s).

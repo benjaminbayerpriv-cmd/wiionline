@@ -1,6 +1,6 @@
 # Fertig gebauter Kern (Eigentümer-Entscheidung: im Repo)
 
-`dolphin-core-upstream.js` / `.wasm`: Dolphin e22551e + `native/patches/0001–0076`, Emscripten 5.0.7, gebaut mit `scripts/core-build.sh`.
+`dolphin-core-upstream.js` / `.wasm`: Dolphin e22551e + `native/patches/0001–0077`, Emscripten 5.0.7, gebaut mit `scripts/core-build.sh`.
 Lizenz GPLv2+ (`native/LICENSE.wasm-dolphin`); Quelltext/Patches/Build-Skript liegen in diesem Repo. Enthält kein Spiel, keine Firmware, keine Zugangsdaten.
 
 Einbinden und starten:
