@@ -1,6 +1,6 @@
 --- a/Source/Core/Common/GL/GLInterface/Emscripten.cpp
 +++ b/Source/Core/Common/GL/GLInterface/Emscripten.cpp
-@@ -7,6 +7,7 @@
+@@ -7,12 +7,15 @@
  #include <cstdint>
  #include <thread>
  #include <vector>
@@ -8,7 +8,78 @@
  #include <emscripten/console.h>
  #include <emscripten/emscripten.h>
  #include <emscripten/html5.h>
-@@ -298,10 +299,28 @@
+ #include <emscripten/html5_webgl.h>
+ #include <GLES3/gl3.h>
+ 
++extern "C" int DolphinWeb_OglFlag(int which);
++
+ extern "C" int DolphinWeb_UseWorkerOwnedWebGL();
+ extern "C" int DolphinWeb_UseDiagnosticOglClear();
+ extern "C" int DolphinWeb_UseOglReadbackPresent();
+@@ -78,9 +81,59 @@
+   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+   glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+   glPixelStorei(GL_PACK_ALIGNMENT, 1);
+-  glReadPixels(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height), GL_RGBA,
+-               GL_UNSIGNED_BYTE, s_readback_data.data());
+-  if (glGetError() != GL_NO_ERROR)
++  // Patch 0073: Direktes glReadPixels in den Shared-Memory-Heap (SharedArrayBuffer) ist in Chrome sehr
++  // langsam (~1 s fuer 640x528). Deshalb in einen eigenen, nicht geteilten Puffer lesen und kopieren.
++  const int rb_ok = EM_ASM_INT({
++    const ctx = (typeof Module !== 'undefined' && Module._dolphinWorkerGLCtx) ||
++                (typeof GL !== 'undefined' && GL.currentContext ? GL.currentContext.GLctx : null);
++    if (!ctx) return 0;
++    const size = $1 * $2 * 4;
++    if (!Module.__dolphinRbBuf || Module.__dolphinRbBuf.length !== size)
++      Module.__dolphinRbBuf = new Uint8Array(size);
++    if ($3 == 1 && ctx.commit) ctx.commit();
++    if ($3 == 2) ctx.finish();
++    if ($3 == 3) { ctx.flush(); }
++    const t0 = performance.now();
++    if ($3 == 4) {
++      // Variante: Standard-Framebuffer erst in eine Textur kopieren, dann aus einem eigenen FBO lesen.
++      if (!Module.__rbFbo || Module.__rbFboW !== $1 || Module.__rbFboH !== $2) {
++        Module.__rbTex = ctx.createTexture();
++        const prev = ctx.getParameter(ctx.TEXTURE_BINDING_2D);
++        ctx.bindTexture(ctx.TEXTURE_2D, Module.__rbTex);
++        ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, $1, $2, 0, ctx.RGBA, ctx.UNSIGNED_BYTE, null);
++        ctx.bindTexture(ctx.TEXTURE_2D, prev);
++        Module.__rbFbo = ctx.createFramebuffer();
++        const pf = ctx.getParameter(ctx.FRAMEBUFFER_BINDING);
++        ctx.bindFramebuffer(ctx.FRAMEBUFFER, Module.__rbFbo);
++        ctx.framebufferTexture2D(ctx.FRAMEBUFFER, ctx.COLOR_ATTACHMENT0, ctx.TEXTURE_2D, Module.__rbTex, 0);
++        ctx.bindFramebuffer(ctx.FRAMEBUFFER, pf);
++        Module.__rbFboW = $1; Module.__rbFboH = $2;
++      }
++      const prevTex = ctx.getParameter(ctx.TEXTURE_BINDING_2D);
++      const prevFb = ctx.getParameter(ctx.FRAMEBUFFER_BINDING);
++      ctx.bindFramebuffer(ctx.FRAMEBUFFER, null);
++      ctx.bindTexture(ctx.TEXTURE_2D, Module.__rbTex);
++      ctx.copyTexSubImage2D(ctx.TEXTURE_2D, 0, 0, 0, 0, 0, $1, $2);
++      ctx.bindTexture(ctx.TEXTURE_2D, prevTex);
++      ctx.bindFramebuffer(ctx.FRAMEBUFFER, Module.__rbFbo);
++      ctx.readPixels(0, 0, $1, $2, ctx.RGBA, ctx.UNSIGNED_BYTE, Module.__dolphinRbBuf);
++      ctx.bindFramebuffer(ctx.FRAMEBUFFER, prevFb);
++    } else {
++      ctx.readPixels(0, 0, $1, $2, ctx.RGBA, ctx.UNSIGNED_BYTE, Module.__dolphinRbBuf);
++    }
++    const t1 = performance.now();
++    HEAPU8.set(Module.__dolphinRbBuf, $0);
++    const t2 = performance.now();
++    if (!Module.__rbSmall) Module.__rbSmall = new Uint8Array(64 * 64 * 4);
++    ctx.readPixels(0, 0, 64, 64, ctx.RGBA, ctx.UNSIGNED_BYTE, Module.__rbSmall);
++    const t3 = performance.now();
++    ctx.readPixels(0, 0, $1, $2, ctx.RGBA, ctx.UNSIGNED_BYTE, Module.__dolphinRbBuf);
++    const t4 = performance.now();
++    const d = Module.__rbDiag || (Module.__rbDiag = [0, 0, 0, 0]);
++    d[0] += t1 - t0; d[1] += t2 - t1; d[2] += t3 - t2; d[3] += t4 - t3;
++    return 1;
++  }, s_readback_data.data(), width, height, DolphinWeb_OglFlag(2));
++  if (!rb_ok || glGetError() != GL_NO_ERROR)
+     return 0;
+ 
+   const std::uint32_t published_rgba = static_cast<std::uint32_t>(s_readback_data[0]) |
+@@ -298,10 +351,72 @@
  
    m_backbuffer_width = 640;
    m_backbuffer_height = 480;
@@ -18,7 +89,7 @@
 +
 +// wiionline (Patch 0073): Zeitmessung des Readbacks je Swap (Diagnose).
 +static std::atomic<std::uint64_t> s_web_swap_total_us{0}, s_web_swap_rb_us{0}, s_web_swap_rb_max_us{0},
-+    s_web_swap_calls{0}, s_web_swap_rb_calls{0};
++    s_web_swap_calls{0}, s_web_swap_rb_calls{0}, s_web_swap_px_us{0};
 +extern "C" unsigned long long DolphinWeb_OglSwapTiming(int which)
 +{
 +  switch (which)
@@ -27,17 +98,61 @@
 +  case 1: return s_web_swap_total_us.load(std::memory_order_relaxed);
 +  case 2: return s_web_swap_rb_us.load(std::memory_order_relaxed);
 +  case 4: return s_web_swap_rb_calls.load(std::memory_order_relaxed);
++  case 5: return s_web_swap_px_us.load(std::memory_order_relaxed);
 +  default: return s_web_swap_rb_max_us.load(std::memory_order_relaxed);
 +  }
++}
++
++// Diagnose: WebGL-Aufrufzaehler/-zeiten (Kontext des GPU-Threads), je Swap in dieses Feld exportiert.
++static double s_web_gl_stats[24];
++extern "C" double DolphinWeb_OglGlStat(int i)
++{
++  return (i >= 0 && i < 24) ? s_web_gl_stats[i] : 0.0;
  }
  
  void GLContextEmscripten::Swap()
  {
 +  const double swap_t0 = emscripten_get_now();
++  static bool s_gl_stats_installed = false;
++  if (!s_gl_stats_installed)
++  {
++    s_gl_stats_installed = true;
++    emscripten_run_script(R"JS(
++      (function() {
++        const ctx = (typeof Module !== 'undefined' && Module._dolphinWorkerGLCtx) ||
++                    (typeof GL !== 'undefined' && GL.currentContext ? GL.currentContext.GLctx : null);
++        if (!ctx) return;
++        const st = {};
++        const names = ['linkProgram', 'compileShader', 'texImage2D', 'texSubImage2D', 'drawElements', 'drawArrays',
++                       'bufferData', 'bufferSubData'];
++        for (const n of names) {
++          const orig = ctx[n];
++          if (typeof orig !== 'function') continue;
++          st[n] = [0, 0];
++          ctx[n] = function() {
++            const t = performance.now();
++            const r = orig.apply(this, arguments);
++            st[n][0]++; st[n][1] += performance.now() - t;
++            return r;
++          };
++        }
++        Module.__glExport = function(ptr) {
++          let i = 0;
++          for (const n of names) {
++            const v = st[n] || [0, 0];
++            HEAPF64[(ptr >> 3) + i++] = v[0]; HEAPF64[(ptr >> 3) + i++] = v[1];
++          }
++          const d = Module.__rbDiag || [0, 0, 0, 0];
++          for (let k = 0; k < 4; ++k) HEAPF64[(ptr >> 3) + 16 + k] = d[k];
++        };
++      })();
++    )JS");
++  }
++  EM_ASM({ if (Module.__glExport) Module.__glExport($0); }, s_web_gl_stats);
    static std::uint32_t s_diagnostic_clear_frame = 0;
    std::uint32_t readback_rgba = 0;
    if (DolphinWebUseDiagnosticClear())
-@@ -326,7 +345,32 @@
+@@ -326,7 +441,37 @@
  
    const bool worker_owned_webgl = DolphinWeb_UseWorkerOwnedWebGL() != 0;
    if (worker_owned_webgl && DolphinWebUseOglReadbackPresent())
@@ -45,8 +160,7 @@
 +  {
 +    // Patch 0075: Readback nur bei neuem Bildinhalt (neue EFB->XFB-Kopie) bzw. spaetestens alle 30 Swaps
 +    // oder bei geaenderter Groesse; Module.dolphinOglReadbackEverySwap=true stellt das alte Verhalten her.
-+    static const bool s_every_swap = EM_ASM_INT({ return (typeof Module !== 'undefined' &&
-+                                                            Module['dolphinOglReadbackEverySwap']) ? 1 : 0; }) != 0;
++    const bool s_every_swap = DolphinWeb_OglFlag(0) != 0;
 +    static unsigned s_last_xfb_copies = ~0u;
 +    static std::uint32_t s_last_w = 0, s_last_h = 0;
 +    static unsigned s_swaps_since_readback = 0;
@@ -62,6 +176,12 @@
 +      s_swaps_since_readback = 0;
 +      readback_rgba = DolphinWebPublishAsyncReadback(m_backbuffer_width, m_backbuffer_height);
 +      s_web_swap_rb_calls.fetch_add(1, std::memory_order_relaxed);
++      // Diagnose: Latenz eines 1x1-glReadPixels direkt danach (Pipeline leer) = reine Round-Trip-Zeit.
++      const double px_t0 = emscripten_get_now();
++      std::uint8_t px[4];
++      glReadPixels(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
++      s_web_swap_px_us.fetch_add(static_cast<std::uint64_t>((emscripten_get_now() - px_t0) * 1000.0),
++                                 std::memory_order_relaxed);
 +    }
 +    const auto rb_us = static_cast<std::uint64_t>((emscripten_get_now() - rb_t0) * 1000.0);
 +    s_web_swap_rb_us.fetch_add(rb_us, std::memory_order_relaxed);
@@ -71,7 +191,7 @@
  
    const std::uint32_t debug_bits = DolphinWebOglDebugBits();
    const int gl_error = static_cast<int>(glGetError());
-@@ -428,6 +472,9 @@
+@@ -428,6 +573,9 @@
      // happening before transferToImageBitmap captured the next frame.
      // For now, accept the over-speed; pace via something else later.
    }

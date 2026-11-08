@@ -1,0 +1,25 @@
+--- a/Source/Core/VideoCommon/VideoConfig.cpp
++++ b/Source/Core/VideoCommon/VideoConfig.cpp
+@@ -3,6 +3,10 @@
+ 
+ #include "VideoCommon/VideoConfig.h"
+ 
++#ifdef __EMSCRIPTEN__
++extern "C" int DolphinWeb_OglFlag(int which);
++#endif
++
+ #include <algorithm>
+ #include <optional>
+ 
+@@ -187,7 +191,10 @@
+   // VI vsync to present, but only when OGL is the active backend - the
+   // software backend keeps its skip semantics so it doesn't waste CPU on
+   // redundant Present() work.
+-  if (Config::Get(Config::MAIN_GFX_BACKEND) == "OGL")
++  // wiionline (Patch 0075): Module.dolphinOglSkipDuplicateXFB=true behaelt das Ueberspringen
++  // doppelter XFBs auch bei OGL bei (jedes VI-Wiederholungs-Present kostet sonst GPU-/Readback-Zeit).
++  const bool s_ogl_skip_duplicates = DolphinWeb_OglFlag(1) != 0;
++  if (Config::Get(Config::MAIN_GFX_BACKEND) == "OGL" && !s_ogl_skip_duplicates)
+     bSkipPresentingDuplicateXFBs = false;
+   // ImmediateXFB was tried here but it disables the ViSwap path that drives
+   // OGL swaps at 60Hz. Without ViSwap, presents only fire on EFB->XFB copies,

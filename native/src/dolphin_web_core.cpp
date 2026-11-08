@@ -631,6 +631,9 @@ void EnsureRuntime()
                                                          Module['dolphinOglEfbCopyToRam']) ? 1 : 0; }) != 0;
   if (ogl_efb_copy_to_ram)
     Config::SetBase(Config::GFX_HACK_SKIP_EFB_COPY_TO_RAM, false);
+  DolphinWeb_SetOglFlag(0, EM_ASM_INT({ return (typeof Module !== 'undefined' && Module['dolphinOglReadbackEverySwap']) ? 1 : 0; }));
+  DolphinWeb_SetOglFlag(2, EM_ASM_INT({ return (typeof Module !== 'undefined' && Module['dolphinOglRbMode']) ? Module['dolphinOglRbMode'] : 0; }));
+  DolphinWeb_SetOglFlag(1, EM_ASM_INT({ return (typeof Module !== 'undefined' && Module['dolphinOglSkipDuplicateXFB']) ? 1 : 0; }));
   Config::SetBase(Config::GFX_HACK_COPY_EFB_SCALED, false);
   // §28cx: ubershaders DISCRIMINATOR (May-30). The UBO const-index fix made the
   // uber pixel shaders translate (fail 27->0) and 7195 draws execute, but the EFB
@@ -1400,6 +1403,8 @@ int RunPpcWasmIntegerBlockSmoke()
 // ---------------------------------------------------------------------------
 #include <emscripten.h>
 #include "Core/HW/Memmap.h"
+
+extern "C" void DolphinWeb_SetOglFlag(int which, int value);
 
 static const std::uint8_t* WiiOnlineGuestPtr(std::uint32_t addr, std::uint32_t len)
 {

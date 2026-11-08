@@ -519,9 +519,21 @@ std::string RasterProfileStats()
 }
 
 extern "C" unsigned DolphinWeb_PeCounter(int which);
+// OGL-Schalter (0: Readback je Swap erzwingen, 1: doppelte XFBs auch bei OGL ueberspringen); vom Kern bei Init gesetzt.
+static std::atomic<int> s_ogl_flags[4];
+extern "C" int DolphinWeb_OglFlag(int which)
+{
+  return (which >= 0 && which < 4) ? s_ogl_flags[which].load(std::memory_order_relaxed) : 0;
+}
+extern "C" void DolphinWeb_SetOglFlag(int which, int value)
+{
+  if (which >= 0 && which < 4)
+    s_ogl_flags[which].store(value, std::memory_order_relaxed);
+}
 extern "C" unsigned DolphinWeb_PiIrqCount(int bit);
 extern "C" unsigned DolphinWeb_XfbCopyCount();
 extern "C" unsigned long long DolphinWeb_OglSwapTiming(int which);
+extern "C" double DolphinWeb_OglGlStat(int i);
 
 std::string OglSwapStats()
 {
@@ -537,7 +549,10 @@ std::string OglSwapStats()
       << " pe:" << DolphinWeb_PeCounter(0) << "/" << DolphinWeb_PeCounter(2) << "/"
       << DolphinWeb_PeCounter(1) << "/" << DolphinWeb_PeCounter(3) << "/" << DolphinWeb_PeCounter(4);
   out << " swapt:" << DolphinWeb_OglSwapTiming(0) << "/" << DolphinWeb_OglSwapTiming(1) << "/"
-      << DolphinWeb_OglSwapTiming(2) << "/" << DolphinWeb_OglSwapTiming(3) << "/" << DolphinWeb_OglSwapTiming(4);
+      << DolphinWeb_OglSwapTiming(2) << "/" << DolphinWeb_OglSwapTiming(3) << "/" << DolphinWeb_OglSwapTiming(4) << "/" << DolphinWeb_OglSwapTiming(5);
+  out << " gl:";
+  for (int i = 0; i < 20; ++i)
+    out << static_cast<long long>(DolphinWeb_OglGlStat(i)) << (i < 19 ? "/" : "");
   out << " xfbc:" << DolphinWeb_XfbCopyCount();
   out << " irq:";
   for (int b = 0; b < 15; ++b)
