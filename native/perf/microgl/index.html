@@ -1,0 +1,7 @@
+<!doctype html><meta charset=utf-8><title>microgl</title><script>
+const o = JSON.parse(decodeURIComponent(location.hash.slice(1) || "{}")); const out = []; window.OUT = out; let i = 0; const list = o.variants || [[]];
+function next() { if (i >= list.length) { window.RESULT = out; return; } const w = new Worker("worker.js");
+  w.onmessage = (e) => { out.push(e.data); w.terminate(); setTimeout(next, 400); }; w.onerror = (e) => { out.push({ error: String(e.message) }); w.terminate(); setTimeout(next, 400); };
+  w.postMessage({ flags: list[i++], w: o.w || 640, h: o.h || 528, frames: o.frames || 30, draws: o.draws || 12 }); }
+next();
+</script>
